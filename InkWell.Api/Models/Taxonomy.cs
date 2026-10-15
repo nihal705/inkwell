@@ -1,0 +1,6 @@
+namespace InkWell.Api.Models;
+public class Category { public int Id { get; set; } public string Name { get; set; } = string.Empty; public string Slug { get; set; } = string.Empty; public ICollection<PostCategory> PostCategories { get; set; } = new List<PostCategory>(); }
+public class Tag { public int Id { get; set; } public string Name { get; set; } = string.Empty; public string Slug { get; set; } = string.Empty; public ICollection<PostTag> PostTags { get; set; } = new List<PostTag>(); }
+public class PostCategory { public int PostId { get; set; } public Post Post { get; set; } = null!; public int CategoryId { get; set; } public Category Category { get; set; } = null!; }
+public class PostTag { public int PostId { get; set; } public Post Post { get; set; } = null!; public int TagId { get; set; } public Tag Tag { get; set; } = null!; }
+public class PostReviewHistory { public int Id { get; set; } public int PostId { get; set; } public Post Post { get; set; } = null!; public int AdminId { get; set; } public User Admin { get; set; } = null!; public string Action { get; set; } = string.Empty; public string? Comments { get; set; } public DateTime ReviewedAt { get; set; } = DateTime.UtcNow; }
