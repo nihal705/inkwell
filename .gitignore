@@ -48,3 +48,5 @@ publish/
 article.json
 post_article.py
 export_for_ai.ps1
+# Cursor IDE
+.cursor/
