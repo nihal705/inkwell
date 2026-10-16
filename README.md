@@ -4,6 +4,8 @@ An article publishing platform where anyone can write and post. New writers regi
 
 Built with .NET 10, EF Core, Neon PostgreSQL, Cloudinary, and a vanilla JavaScript SPA.
 
+**Live:** [https://inkwell-3m7y.onrender.com](https://inkwell-3m7y.onrender.com)
+
 ---
 
 ## Features
