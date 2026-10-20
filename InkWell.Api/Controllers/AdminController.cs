@@ -10,7 +10,11 @@ namespace InkWell.Api.Controllers;
 [ApiController, Route("api/admin"), Authorize(Roles = "Admin")]
 public class AdminController(AppDbContext db) : ControllerBase
 {
-    IQueryable<Post> Details() => db.Posts.Include(x => x.Author).Include(x => x.PostCategories).ThenInclude(x => x.Category).Include(x => x.PostTags).ThenInclude(x => x.Tag);
+   IQueryable<Post> Details() => db.Posts
+    .Include(x => x.Author)
+    .Include(x => x.Images)
+    .Include(x => x.PostCategories).ThenInclude(x => x.Category)
+    .Include(x => x.PostTags).ThenInclude(x => x.Tag);
     [HttpGet("stats")] public async Task<IActionResult> Stats() => Ok(new { published = await db.Posts.CountAsync(x => x.Status == "Published"), pendingPosts = await db.Posts.CountAsync(x => x.Status == "PendingReview"), pendingApplications = await db.EditorApplications.CountAsync(x => x.Status == "Pending"), readers = await db.Users.CountAsync(x => x.Role == "Reader"), editors = await db.Users.CountAsync(x => x.Role == "Editor") });
     [HttpGet("pending-posts")] public async Task<IActionResult> PendingPosts() => Ok((await Details().Where(x => x.Status == "PendingReview").ToListAsync()).Select(x => ApiMapper.Post(x, true)));
     [HttpGet("applications")] public async Task<IActionResult> Applications() => Ok((await db.EditorApplications.Include(x => x.User).OrderByDescending(x => x.AppliedAt).ToListAsync()).Select(EditorApplicationsController.Map));

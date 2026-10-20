@@ -31,5 +31,22 @@ public class ProfileDto
   public string? LinkedInUrl { get; set; }
 }
 public class EditorApplicationDto { [Required, MinLength(30)] public string Motivation { get; set; } = ""; }
-public class PostCreateDto { [Required, MaxLength(255)] public string Title { get; set; } = ""; [Required] public string Content { get; set; } = ""; public string? MainImageUrl { get; set; } public List<string> Categories { get; set; } = []; public List<string> Tags { get; set; } = []; public bool SaveAsDraft { get; set; } }
+
+public class PostImageDto 
+{ 
+    public string Url { get; set; } = ""; 
+    public string? Caption { get; set; } 
+}
+
+public class PostCreateDto 
+{ 
+    [Required, MaxLength(255)] public string Title { get; set; } = ""; 
+    [Required] public string Content { get; set; } = ""; 
+    public string? MainImageUrl { get; set; } 
+    public List<PostImageDto> Images { get; set; } = []; 
+    public List<string> Categories { get; set; } = []; 
+    public List<string> Tags { get; set; } = []; 
+    public bool SaveAsDraft { get; set; } 
+}
+
 public class ReviewDto { [Required] public string Action { get; set; } = ""; public string? Comments { get; set; } }
