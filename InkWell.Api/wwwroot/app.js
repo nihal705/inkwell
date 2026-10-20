@@ -199,8 +199,8 @@ function shell(content) {
         </div>
         <div>
           <b>Write</b>
-          <a href="#/register">Start writing</a>
-          ${u?.role !== "Reader" ? `<a href="#/editor">Dashboard</a>` : ""}
+          ${u ? `<a href="#/editor/new">New article</a>
+                <a href="#/editor">Dashboard</a>` : `<a href="#/register">Start writing</a>`}
         </div>
         <div>
           <b>Legal</b>
@@ -264,7 +264,9 @@ async function home() {
         <p>Ideas worth sitting with, stories worth sharing, and a welcoming room for your next piece of work.</p>
         <div class="actions">
           <a class="button" href="#articles">Start reading <span>→</span></a>
-          <a class="button secondary" href="#/register">Start writing</a>
+          <a class="button secondary" href="${state.user ? "#/editor/new" : "#/register"}">
+            ${state.user ? "Continue writing" : "Start writing"}
+          </a>
         </div>
       </div>
       <div class="hero-art">
@@ -291,10 +293,12 @@ async function home() {
       <div>
         <div class="eyebrow">Your perspective matters</div>
         <h2>Have something to say?</h2>
-        <p>Apply, get approved, and publish alongside a community of curious people.</p>
+        <p>Write your next article and share it with a community of curious readers.</p>
       </div>
-      <a class="button pale" href="#/register">Start writing →</a>
-    </section>`);
+      <a class="button pale" href="${state.user ? "#/editor/new" : "#/register"}">
+        ${state.user ? "Write an article" : "Start writing"} →
+      </a>
+    </section>
 
   try {
     const [cats, data] = await Promise.all([
