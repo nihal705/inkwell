@@ -28,6 +28,7 @@ var key = Encoding.UTF8.GetBytes(jwtKey);
 
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
+builder.Services.AddHttpClient<IEmailService, EmailJsService>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

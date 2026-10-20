@@ -50,3 +50,21 @@ public class PostCreateDto
 }
 
 public class ReviewDto { [Required] public string Action { get; set; } = ""; public string? Comments { get; set; } }
+
+public class ForgotPasswordRequestDto
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = "";
+}
+
+public class ForgotPasswordResetDto
+{
+    [Required, EmailAddress]
+    public string Email { get; set; } = "";
+
+    [Required, StringLength(6, MinimumLength = 6)]
+    public string OtpCode { get; set; } = "";
+
+    [Required, MinLength(8)]
+    public string NewPassword { get; set; } = "";
+}
