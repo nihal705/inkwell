@@ -91,7 +91,7 @@ const initials = (u) =>
 const avatarImg = (u) =>
   u?.profilePictureUrl
     ? `<img src="${esc(u.profilePictureUrl)}" alt="">`
-    : initials(u);
+    : `<span>${initials(u)}</span>`;
 
 function toast(message, type = "") {
   const t = $("#toast");

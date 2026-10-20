@@ -174,8 +174,9 @@ header {
 }
 .avatar,
 .mini-avatar {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   background: var(--soft);
   color: var(--accent);
@@ -183,6 +184,7 @@ header {
   width: 34px;
   height: 34px;
   overflow: hidden;
+  line-height: 1;
 }
 .avatar img {
   width: 100%;
@@ -1690,4 +1692,15 @@ label small {
 }
 [data-theme="dark"] .article-content .article-image img {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Restore avatar styling inside side-blocks */
+.sidebar .side-block > a.mini-avatar,
+.sidebar .side-block > a.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 700;
 }
