@@ -380,6 +380,40 @@ async function category(name) {
       );
 }
 
+// ==================== HOUSE ADS ====================
+function renderAd() {
+  const ads = {
+    mycodendotes: `
+      <div class="promo-card">
+        <div class="promo-img" style="background-image: url('/assets/mycodenotes.png');"></div>
+        <div class="promo-content">
+          <span class="promo-tag">Creator's Pick</span>
+          <h3>MyCodeNotes</h3>
+          <p>A structured learning hub for DSA, web dev, and quick notes. Features NextraAI, LeetCode solutions, and more.</p>
+          <a href="https://mycodenotes.dev" target="_blank" class="promo-btn">Visit Site →</a>
+        </div>
+      </div>
+    `,
+    kwikcric: `
+      <div class="promo-card">
+        <div class="promo-img" style="background-image: url('/assets/kwikcric.png');"></div>
+        <div class="promo-content">
+          <span class="promo-tag">Creator's Pick</span>
+          <h3>KwikCric</h3>
+          <p>A comprehensive cricket platform combining extensive stats, interactive games, tournament history, and player rankings.</p>
+          <a href="https://kwikcric.vercel.app" target="_blank" class="promo-btn">Play Now →</a>
+        </div>
+      </div>
+    `
+  };
+  
+  // Randomly pick an ad
+  const adKeys = Object.keys(ads);
+  const randomAd = ads[adKeys[Math.floor(Math.random() * adKeys.length)]];
+  
+  return randomAd;
+}
+
 // ==================== POST PAGE ====================
 async function postPage(id) {
   shell(`<div class="article-skeleton wrap"></div>`);
@@ -437,6 +471,7 @@ async function postPage(id) {
               <button id="share-copy" title="Copy link">⧉</button>
             </div>
           </div>
+          ${renderAd()}
         </aside>
 
         <article class="article-body">

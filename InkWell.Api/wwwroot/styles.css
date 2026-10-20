@@ -1695,7 +1695,6 @@ label small {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
-/* Restore avatar styling inside side-blocks */
 .sidebar .side-block > a.mini-avatar,
 .sidebar .side-block > a.avatar {
   display: inline-flex;
@@ -1704,4 +1703,68 @@ label small {
   padding: 0;
   color: var(--accent);
   font-weight: 700;
+}
+
+.promo-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.promo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(194, 65, 12, 0.12);
+  border-color: var(--accent);
+}
+.promo-img {
+  width: 100%;
+  height: 130px;
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid var(--line);
+}
+.promo-content {
+  padding: 16px;
+  position: relative;
+}
+.promo-tag {
+  display: inline-block;
+  background: var(--soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+.promo-card h3 {
+  font: 600 18px/1.2 Fraunces;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+.promo-card p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+.promo-btn {
+  display: block;
+  text-align: center;
+  background: var(--ink);
+  color: var(--paper);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px;
+  border-radius: 6px;
+  transition: 0.2s;
+}
+.promo-btn:hover {
+  background: var(--accent);
 }
