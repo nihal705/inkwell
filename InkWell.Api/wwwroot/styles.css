@@ -185,6 +185,7 @@ header {
   height: 34px;
   overflow: hidden;
   line-height: 1;
+  flex-shrink: 0;
 }
 .avatar img {
   width: 100%;
@@ -384,7 +385,7 @@ header {
   color: var(--muted);
   margin-top: 18px;
 }
-.byline span:last-child {
+.byline > span:last-child {
   margin-left: auto;
 }
 .cta {
