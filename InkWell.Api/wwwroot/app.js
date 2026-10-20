@@ -365,6 +365,147 @@ async function categoriesPage() {
   }
 }
 
+// ==================== CATEGORY ====================
+async function category(name) {
+  shell(
+    `<section class="page-head wrap"><div class="eyebrow">InkWell category</div><h1>${esc(name)}</h1><p>Stories gathered around one good question.</p></section><section class="wrap post-grid" id="posts"></section>`,
+  );
+  const d = await api(`/api/posts?category=${encodeURIComponent(name)}`);
+  $("#posts").innerHTML = d.items.length
+    ? d.items.map(card).join("")
+    : empty(
+        "No published articles in this category yet.",
+        "Explore all stories",
+        "#/",
+      );
+}
+
+// ==================== POST PAGE ====================
+async function postPage(id) {
+  shell(`<div class="article-skeleton wrap"></div>`);
+  try {
+    const p = await api(`/api/posts/${id}`);
+    document.title = `${p.title} — InkWell`;
+
+    const paragraphs = (p.content || "")
+      .split(/\n{2,}/)
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith("#") && !l.startsWith(">"));
+    const deck = paragraphs[0] || "";
+
+    const toc = [];
+    p.content.replace(/^(##|###) (.+)$/gm, (m, hashes, text) => {
+      const slug = text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      toc.push({ level: hashes.length, text, slug });
+    });
+
+    let contentHtml = markdown(p.content);
+    toc.forEach((t) => {
+      const safe = t.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      contentHtml = contentHtml.replace(
+        new RegExp(`<h${t.level}>${safe}</h${t.level}>`),
+        `<h${t.level} id="${t.slug}">${t.text}</h${t.level}>`,
+      );
+    });
+
+    const shareUrl = location.href;
+    const shareText = encodeURIComponent(p.title + " — InkWell");
+    const encUrl = encodeURIComponent(shareUrl);
+
+    shell(`
+      <div class="wrap article-layout">
+        <aside class="sidebar sidebar-left">
+          <div class="side-block author-card">
+            <a class="mini-avatar large" href="#/author/${p.author.id}">${avatarImg(p.author)}</a>
+            <div>
+              <a href="#/author/${p.author.id}">${esc(p.author.displayName || p.author.username)}</a>
+              <small>${date(p.publishedAt || p.createdAt)} · ${p.readingTimeMinutes} min read</small>
+            </div>
+          </div>
+          ${p.categories.length ? `<div class="side-block"><b>Filed under</b>${p.categories.map((c) => `<a href="#/category/${encodeURIComponent(c)}">${esc(c)}</a>`).join("")}</div>` : ""}
+          ${p.tags.length ? `<div class="side-block"><b>Tags</b><div class="tag-list">${p.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join("")}</div></div>` : ""}
+          <div class="side-block">
+            <b>Share</b>
+            <div class="share-mini">
+              <a href="https://wa.me/?text=${shareText}%20${encUrl}" target="_blank" rel="noopener" title="WhatsApp">W</a>
+              <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${encUrl}" target="_blank" rel="noopener" title="X">X</a>
+              <a href="https://www.facebook.com/sharer/sharer.php?u=${encUrl}" target="_blank" rel="noopener" title="Facebook">f</a>
+              <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encUrl}" target="_blank" rel="noopener" title="LinkedIn">in</a>
+              <button id="share-copy" title="Copy link">⧉</button>
+            </div>
+          </div>
+        </aside>
+
+        <article class="article-body">
+          <div class="article-head">
+            <div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div>
+            <h1>${esc(p.title)}</h1>
+            ${deck ? `<p class="deck">${esc(deck)}</p>` : ""}
+          </div>
+          ${p.mainImageUrl ? `<img class="article-cover" src="${esc(p.mainImageUrl)}" alt="">` : ""}
+          <div class="article-content">
+            ${contentHtml}
+            <hr>
+            <div class="author-bio">
+              <span class="mini-avatar large">${avatarImg(p.author)}</span>
+              <div>
+                <b>Written by ${esc(p.author.displayName || p.author.username)}</b>
+                <p>${esc(p.author.bio || "A contributing writer at InkWell.")}</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <aside class="sidebar sidebar-right">
+          ${toc.length ? `<div class="side-block"><b>On this page</b><nav class="toc">${toc.map((t) => `<a class="toc-lv${t.level}" href="#${t.slug}" data-toc="${t.slug}">${esc(t.text)}</a>`).join("")}</nav></div>` : ""}
+          <div class="side-block">
+            <b>More from InkWell</b>
+            <div id="related" class="related-list"></div>
+          </div>
+        </aside>
+      </div>
+    `);
+
+    try {
+      const list = await api("/api/posts?page=1");
+      const others = list.items.filter((x) => x.id !== p.id).slice(0, 4);
+      $("#related").innerHTML = others.length
+        ? others
+            .map(
+              (r) =>
+                `<a class="related-item" href="#/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
+            )
+            .join("")
+        : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
+    } catch {}
+
+    $("#share-copy")?.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard?.writeText(shareUrl);
+        toast("Link copied.");
+      } catch {
+        toast("Could not copy.", "error");
+      }
+    });
+
+    $$(".toc a").forEach((a) =>
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        document
+          .getElementById(a.dataset.toc)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }),
+    );
+  } catch (e) {
+    shell(
+      `<section class="wrap page-head">${empty(e.message, "Back home", "#/")}</section>`,
+    );
+  }
+}
+
 // ==================== AUTH ====================
 function authPage(mode) {
   const login = mode === "login";
@@ -445,7 +586,7 @@ function forgotPasswordPage() {
 
             <div id="otp-fields" style="display:none">
               <label>6-digit code
-                <input type="text" name="otpCode" placeholder="123456" maxlength="6" pattern="\\d{6}" autocomplete="one-time-code">
+                <input type="text" name="otpCode" placeholder="123456" maxlength="6" pattern="\\d{6}" autocomplete="one-time-code" inputmode="numeric">
               </label>
               <label>New password
                 <input type="password" name="newPassword" minlength="8" autocomplete="new-password">
@@ -485,6 +626,7 @@ function forgotPasswordPage() {
         $("#forgot-subtitle").textContent =
           `Enter the 6-digit code sent to ${userEmail}`;
         $("#otp-fields").style.display = "block";
+        $("#spam-note").style.display = "block";
         btn.textContent = "Reset password →";
         step = 2;
         document.querySelector("[name=otpCode]").required = true;
