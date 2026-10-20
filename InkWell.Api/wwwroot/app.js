@@ -12,6 +12,7 @@ const state = {
   token: localStorage.getItem("inkwell_token"),
   posts: [],
   categories: [],
+  cloudinary: null,
   theme:
     localStorage.getItem("inkwell_theme") ||
     (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
@@ -19,18 +20,37 @@ const state = {
 document.documentElement.dataset.theme = state.theme;
 
 // ==================== CLOUDINARY UPLOAD ====================
+async function ensureCloudinaryConfig() {
+  if (state.cloudinary) return;
+  try {
+    const res = await fetch("/api/config");
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.cloudinary?.cloudName && cfg.cloudinary?.uploadPreset) {
+        state.cloudinary = cfg.cloudinary;
+        return;
+      }
+    }
+  } catch {}
+  // Fallback to values baked into the app (works even if /api/config is unreachable)
+  state.cloudinary = { cloudName: "xx4lxfgt", uploadPreset: "inkwell_unsigned" };
+}
+
 async function uploadImage(file) {
-  const CLOUD_NAME = "xx4lxfgt";
-  const UPLOAD_PRESET = "inkwell_unsigned";
+  if (!file) throw new Error("No file selected.");
+  if (!file.type.startsWith("image/")) throw new Error("Only image files are allowed.");
+  if (file.size > 8 * 1024 * 1024) throw new Error("Image must be under 8 MB.");
+
+  await ensureCloudinaryConfig();
+  const { cloudName, uploadPreset } = state.cloudinary;
 
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("upload_preset", UPLOAD_PRESET);
+  formData.append("upload_preset", uploadPreset);
 
-  const url = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  const url = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
   const res = await fetch(url, { method: "POST", body: formData });
   const data = await res.json();
-
   if (!res.ok) {
     console.error("Cloudinary error:", data);
     throw new Error(data.error?.message || "Upload failed.");
@@ -117,6 +137,12 @@ function logout() {
 
 function markdown(text) {
   return esc(text)
+    // Images first — safe URL schemes only
+    .replace(/!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g, (_, alt, url) =>
+      `<figure class="article-image"><img src="${url}" alt="${alt}" loading="lazy" />${
+        alt ? `<figcaption>${alt}</figcaption>` : ""
+      }</figure>`
+    )
     .replace(/^### (.*)$/gm, "<h3>$1</h3>")
     .replace(/^## (.*)$/gm, "<h2>$1</h2>")
     .replace(/^# (.*)$/gm, "<h1>$1</h1>")
@@ -125,9 +151,7 @@ function markdown(text) {
     .replace(/\*(.*?)\*/g, "<em>$1</em>")
     .replace(/`(.*?)`/g, "<code>$1</code>")
     .split(/\n{2,}/)
-    .map((x) =>
-      /^<h|^<blockquote/.test(x) ? x : `<p>${x.replace(/\n/g, "<br>")}</p>`,
-    )
+    .map((x) => /^<h|^<blockquote|^<figure/.test(x) ? x : `<p>${x.replace(/\n/g, "<br>")}</p>`)
     .join("");
 }
 
@@ -212,9 +236,11 @@ function bindShell() {
 // ==================== POST CARD ====================
 function card(p) {
   const authorName = p.author.displayName || p.author.username;
+  const extraImgCount = (p.images?.length || 0);
   return `<article class="post-card">
     <a class="cover ${p.mainImageUrl ? "" : "gradient"}" href="#/post/${p.id}">
       ${p.mainImageUrl ? `<img loading="lazy" src="${esc(p.mainImageUrl)}" alt="">` : "<span>✦</span>"}
+      ${extraImgCount > 0 ? `<span class="image-count">📷 ${extraImgCount}</span>` : ""}
     </a>
     <div class="card-body">
       <div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div>
@@ -578,7 +604,7 @@ async function composer(id) {
   if (!guard(["Editor", "Admin"])) return;
   let post = id
     ? await api(`/api/posts/mine/${id}`)
-    : { title: "", content: "", mainImageUrl: "", categories: [], tags: [] };
+    : { title: "", content: "", mainImageUrl: "", categories: [], tags: [], images: [] };
   const curImg = post.mainImageUrl || "";
 
   shell(`<section class="editor-page wrap">
@@ -593,15 +619,24 @@ async function composer(id) {
     <div class="editor-grid">
       <section>
         <input class="title-input" name="title" value="${esc(post.title)}" placeholder="An unforgettable title">
-        <textarea class="writing-area" name="content" placeholder="Start writing…\n\nMarkdown is welcome.">${esc(post.content)}</textarea>
+        <div class="composer-toolbar">
+          <button type="button" data-md="bold" title="Bold"><b>B</b></button>
+          <button type="button" data-md="italic" title="Italic"><i>I</i></button>
+          <button type="button" data-md="link" title="Insert link">🔗</button>
+          <button type="button" data-md="quote" title="Blockquote">"</button>
+          <button type="button" data-md="image" title="Insert image">📷 Image</button>
+        </div>
+        <input type="file" accept="image/*" id="inline-file" style="display:none">
+        <textarea class="writing-area" name="content" placeholder="Start writing…\n\nMarkdown is welcome. Use the 📷 button to insert images anywhere.">${esc(post.content)}</textarea>
       </section>
       <aside class="meta">
         <h2>Story details</h2>
-        <label>Cover image
-          <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,image/*" id="cover-file">
+        <label>Cover image <span style="color:var(--danger)">*</span>
+          <input type="file" accept="image/*" id="cover-file">
           <input type="hidden" name="image" value="${esc(curImg)}">
         </label>
         <div class="image-preview" id="cover-preview">${curImg ? `<img src="${esc(curImg)}" alt="">` : "<span>No cover selected</span>"}</div>
+        <small style="color:var(--muted);font-size:11px;display:block;margin-top:4px">Required to submit.</small>
         <label>Categories <input name="categories" value="${esc(post.categories.join(", "))}" placeholder="Culture, Design"></label>
         <label>Tags <input name="tags" value="${esc(post.tags.join(", "))}" placeholder="writing, ideas"></label>
         <div class="preview-mini" id="preview">Live preview<br><b>${esc(post.title || "Your title")}</b></div>
@@ -616,6 +651,30 @@ async function composer(id) {
     categories: $("[name=categories]"),
     tags: $("[name=tags]"),
   };
+  const inlineFile = $("#inline-file");
+
+  function wrapSelection(before, after = before) {
+    const ta = fields.content;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = ta.value.slice(start, end);
+    const text = ta.value;
+    ta.value = text.slice(0, start) + before + selected + after + text.slice(end);
+    if (selected) ta.setSelectionRange(start + before.length, start + before.length + selected.length);
+    else ta.setSelectionRange(start + before.length, start + before.length);
+    ta.focus();
+  }
+
+  function insertAtCursor(text) {
+    const ta = fields.content;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const text0 = ta.value;
+    ta.value = text0.slice(0, start) + text + text0.slice(end);
+    const pos = start + text.length;
+    ta.setSelectionRange(pos, pos);
+    ta.focus();
+  }
 
   $("#cover-file")?.addEventListener("change", async (e) => {
     const file = e.target.files[0];
@@ -631,47 +690,71 @@ async function composer(id) {
     }
   });
 
-  const payload = (draft) => ({
-    title: fields.title.value,
-    content: fields.content.value,
-    mainImageUrl: fields.image.value,
-    categories: fields.categories.value
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean),
-    tags: fields.tags.value
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean),
-    saveAsDraft: draft,
+  $$("[data-md]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const a = btn.dataset.md;
+      if (a === "bold") wrapSelection("**");
+      else if (a === "italic") wrapSelection("*");
+      else if (a === "quote") wrapSelection("\n> ", "");
+      else if (a === "link") {
+        const url = prompt("Link URL:", "https://");
+        if (url) wrapSelection("[", `](${url})`);
+      } else if (a === "image") inlineFile.click();
+    });
   });
 
+  inlineFile?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      toast("Uploading image…");
+      const url = await uploadImage(file);
+      const alt = file.name.replace(/\.[^.]+$/, "") || "image";
+      insertAtCursor(`\n\n![${alt}](${url})\n\n`);
+      toast("Image inserted.");
+    } catch (err) {
+      toast(err.message, "error");
+    }
+    e.target.value = "";
+  });
+
+  const payload = (draft) => {
+    const content = fields.content.value;
+    const inlineImages = [...content.matchAll(/!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g)]
+      .map(([, alt, url]) => ({ url: url.trim(), caption: alt.trim() || null }));
+
+    return {
+      title: fields.title.value,
+      content,
+      mainImageUrl: fields.image.value,
+      images: inlineImages,
+      categories: fields.categories.value.split(",").map((x) => x.trim()).filter(Boolean),
+      tags: fields.tags.value.split(",").map((x) => x.trim()).filter(Boolean),
+      saveAsDraft: draft,
+    };
+  };
+
   const save = async (draft) => {
+    if (!draft && !fields.image.value) {
+      toast("Please upload a cover image before submitting.", "error");
+      return;
+    }
     const url = id ? `/api/posts/${id}` : "/api/posts";
     const method = id ? "PUT" : "POST";
     const d = await api(url, { method, body: JSON.stringify(payload(draft)) });
     id ||= d.post?.id;
-    $("#save-state").textContent = draft
-      ? "Draft saved"
-      : "Sent to the editorial desk";
+    $("#save-state").textContent = draft ? "Draft saved" : "Sent to the editorial desk";
     toast(d.message);
     if (!draft) location.hash = "#/editor";
   };
 
-  $("#save").addEventListener("click", () =>
-    save(true).catch((e) => toast(e.message, "error")),
-  );
-  $("#submit").addEventListener("click", () =>
-    save(false).catch((e) => toast(e.message, "error")),
-  );
+  $("#save").addEventListener("click", () => save(true).catch((e) => toast(e.message, "error")));
+  $("#submit").addEventListener("click", () => save(false).catch((e) => toast(e.message, "error")));
 
   Object.values(fields).forEach((f) =>
-    f.addEventListener(
-      "input",
-      () =>
-        ($("#preview").innerHTML =
-          `Live preview<br><b>${esc(fields.title.value || "Your title")}</b>`),
-    ),
+    f.addEventListener("input", () => {
+      $("#preview").innerHTML = `Live preview<br><b>${esc(fields.title.value || "Your title")}</b>`;
+    }),
   );
 }
 
@@ -1057,4 +1140,4 @@ addEventListener("keydown", (e) => {
     searchModal();
   }
 });
-render();
+ensureCloudinaryConfig().then(render);
