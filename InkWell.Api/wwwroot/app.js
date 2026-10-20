@@ -340,6 +340,31 @@ async function home() {
   $("#open-search")?.addEventListener("click", searchModal);
 }
 
+// ==================== CATEGORIES PAGE ====================
+async function categoriesPage() {
+  shell(
+    `<section class="page-head wrap"><div class="eyebrow">Explore InkWell</div><h1>All categories</h1><p>Find stories by the questions they explore.</p></section><section class="wrap category-grid" id="cat-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></section>`,
+  );
+  try {
+    const cats = await api("/api/categories");
+    $("#cat-grid").innerHTML = cats.length
+      ? cats
+          .map(
+            (c) =>
+              `<a class="category-card" href="#/category/${encodeURIComponent(c.name)}"><b>${esc(c.name)}</b><span>${c.postCount || 0} ${c.postCount === 1 ? "story" : "stories"}</span></a>`,
+          )
+          .join("")
+      : empty("No categories yet.", "Back home", "#/");
+  } catch (e) {
+    $("#cat-grid").innerHTML = empty(
+      "Could not load categories.",
+      "Try again",
+      "#/categories",
+    );
+    toast(e.message, "error");
+  }
+}
+
 // ==================== AUTH ====================
 function authPage(mode) {
   const login = mode === "login";
