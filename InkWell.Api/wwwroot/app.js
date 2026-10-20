@@ -236,11 +236,9 @@ function bindShell() {
 // ==================== POST CARD ====================
 function card(p) {
   const authorName = p.author.displayName || p.author.username;
-  const extraImgCount = (p.images?.length || 0);
   return `<article class="post-card">
     <a class="cover ${p.mainImageUrl ? "" : "gradient"}" href="#/post/${p.id}">
       ${p.mainImageUrl ? `<img loading="lazy" src="${esc(p.mainImageUrl)}" alt="">` : "<span>✦</span>"}
-      ${extraImgCount > 0 ? `<span class="image-count">📷 ${extraImgCount}</span>` : ""}
     </a>
     <div class="card-body">
       <div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div>
