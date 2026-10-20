@@ -33,12 +33,16 @@ async function ensureCloudinaryConfig() {
     }
   } catch {}
   // Fallback to values baked into the app (works even if /api/config is unreachable)
-  state.cloudinary = { cloudName: "xx4lxfgt", uploadPreset: "inkwell_unsigned" };
+  state.cloudinary = {
+    cloudName: "xx4lxfgt",
+    uploadPreset: "inkwell_unsigned",
+  };
 }
 
 async function uploadImage(file) {
   if (!file) throw new Error("No file selected.");
-  if (!file.type.startsWith("image/")) throw new Error("Only image files are allowed.");
+  if (!file.type.startsWith("image/"))
+    throw new Error("Only image files are allowed.");
   if (file.size > 8 * 1024 * 1024) throw new Error("Image must be under 8 MB.");
 
   await ensureCloudinaryConfig();
@@ -136,23 +140,31 @@ function logout() {
 }
 
 function markdown(text) {
-  return esc(text)
-    // Images first — safe URL schemes only
-    .replace(/!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g, (_, alt, url) =>
-      `<figure class="article-image"><img src="${url}" alt="${alt}" loading="lazy" />${
-        alt ? `<figcaption>${alt}</figcaption>` : ""
-      }</figure>`
-    )
-    .replace(/^### (.*)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.*)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.*)$/gm, "<h1>$1</h1>")
-    .replace(/^&gt; (.*)$/gm, "<blockquote>$1</blockquote>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/`(.*?)`/g, "<code>$1</code>")
-    .split(/\n{2,}/)
-    .map((x) => /^<h|^<blockquote|^<figure/.test(x) ? x : `<p>${x.replace(/\n/g, "<br>")}</p>`)
-    .join("");
+  return (
+    esc(text)
+      // Images first — safe URL schemes only
+      .replace(
+        /!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g,
+        (_, alt, url) =>
+          `<figure class="article-image"><img src="${url}" alt="${alt}" loading="lazy" />${
+            alt ? `<figcaption>${alt}</figcaption>` : ""
+          }</figure>`,
+      )
+      .replace(/^### (.*)$/gm, "<h3>$1</h3>")
+      .replace(/^## (.*)$/gm, "<h2>$1</h2>")
+      .replace(/^# (.*)$/gm, "<h1>$1</h1>")
+      .replace(/^&gt; (.*)$/gm, "<blockquote>$1</blockquote>")
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`(.*?)`/g, "<code>$1</code>")
+      .split(/\n{2,}/)
+      .map((x) =>
+        /^<h|^<blockquote|^<figure/.test(x)
+          ? x
+          : `<p>${x.replace(/\n/g, "<br>")}</p>`,
+      )
+      .join("")
+  );
 }
 
 // ==================== SHELL (Navbar + Footer) ====================
@@ -199,8 +211,12 @@ function shell(content) {
         </div>
         <div>
           <b>Write</b>
-          ${u ? `<a href="#/editor/new">New article</a>
-                <a href="#/editor">Dashboard</a>` : `<a href="#/register">Start writing</a>`}
+          ${
+            u
+              ? `<a href="#/editor/new">New article</a>
+                <a href="#/editor">Dashboard</a>`
+              : `<a href="#/register">Start writing</a>`
+          }
         </div>
         <div>
           <b>Legal</b>
@@ -342,16 +358,17 @@ function authPage(mode) {
             login
               ? ""
               : `<label>Username
-  <input name="username" autocomplete="username" placeholder="G Nihal" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._\- ]{3,40}">
-  <small>Letters, numbers, spaces, dots, hyphens, underscores. 3–40 characters.</small>
-</label>`
+            <input name="username" autocomplete="username" placeholder="G Nihal" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._\- ]{3,40}">
+            <small>Letters, numbers, spaces, dots, hyphens, underscores. 3–40 characters.</small>
+          </label>`
           }
           <label>Email<input type="email" name="email" autocomplete="email" placeholder="you@example.com" required></label>
           <label>Password<input type="password" name="password" autocomplete="${login ? "current-password" : "new-password"}" placeholder="••••••••" required></label>
           <button class="button" type="submit">${login ? "Sign in →" : "Create account →"}</button>
-        </form>
-        <p class="form-foot">${login ? 'New here? <a href="#/register">Create an account</a>' : 'Already a member? <a href="#/login">Sign in</a>'}</p>
-      </div>
+          </form>
+          ${login ? '<p class="form-foot" style="margin-top:10px"><a href="#/forgot-password">Forgot password?</a></p>' : ""}
+          <p class="form-foot">${login ? 'New here? <a href="#/register">Create an account</a>' : 'Already a member? <a href="#/login">Sign in</a>'}</p>
+                </div>
     </section>
   </section>`);
 
@@ -368,8 +385,8 @@ function authPage(mode) {
           body: JSON.stringify(f),
         }),
       );
-      toast(login ? 'Welcome back.' : 'Welcome to InkWell. Start writing.');
-location.hash = '#/editor';
+      toast(login ? "Welcome back." : "Welcome to InkWell. Start writing.");
+      location.hash = "#/editor";
     } catch (err) {
       toast(err.message, "error");
       b.disabled = false;
@@ -378,10 +395,117 @@ location.hash = '#/editor';
   });
 }
 
+// ==================== FORGOT PASSWORD ====================
+function forgotPasswordPage() {
+  shell(`
+    <section class="auth-layout">
+      <aside>
+        <a class="brand" href="#/">Ink<span>Well</span></a>
+        <blockquote>"Not all those who wander are lost."<small>— J.R.R. Tolkien</small></blockquote>
+      </aside>
+      <section class="auth-form">
+        <div>
+          <div class="eyebrow">Account recovery</div>
+          <h1>Reset your password</h1>
+          <p id="forgot-subtitle">Enter your email to receive a 6-digit code.</p>
+
+          <div id="spam-note" style="display:none;margin:0 0 16px 0;padding:10px 14px;background:#fff8e1;border-left:3px solid #d4a72c;border-radius:6px;font-size:13px;line-height:1.5;color:#6b655b;">
+            Can't find the email? Check your <b>spam</b> or <b>promotions</b> folder — it can take up to a minute to arrive.
+          </div>
+
+          <form id="forgot-form">
+            <label>Email
+              <input type="email" name="email" autocomplete="email" required placeholder="you@example.com">
+            </label>
+
+            <div id="otp-fields" style="display:none">
+              <label>6-digit code
+                <input type="text" name="otpCode" placeholder="123456" maxlength="6" pattern="\\d{6}" autocomplete="one-time-code">
+              </label>
+              <label>New password
+                <input type="password" name="newPassword" minlength="8" autocomplete="new-password">
+              </label>
+              <label>Confirm new password
+                <input type="password" name="confirmPassword" minlength="8" autocomplete="new-password">
+              </label>
+            </div>
+
+            <button class="button" type="submit" id="forgot-submit">Send code →</button>
+          </form>
+
+          <p class="form-foot">Remembered it? <a href="#/login">Back to sign in</a></p>
+        </div>
+      </section>
+    </section>
+  `);
+
+  let step = 1;
+  let userEmail = "";
+
+  $("#forgot-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    const btn = $("#forgot-submit");
+    btn.disabled = true;
+
+    if (step === 1) {
+      userEmail = f.email;
+      btn.textContent = "Sending…";
+      try {
+        await api("/api/auth/forgot-password/request-otp", {
+          method: "POST",
+          body: JSON.stringify({ email: userEmail }),
+        });
+        toast("If that email is registered, a code has been sent.");
+        $("#forgot-subtitle").textContent =
+          `Enter the 6-digit code sent to ${userEmail}`;
+        $("#otp-fields").style.display = "block";
+        btn.textContent = "Reset password →";
+        step = 2;
+        document.querySelector("[name=otpCode]").required = true;
+        document.querySelector("[name=newPassword]").required = true;
+        document.querySelector("[name=confirmPassword]").required = true;
+        // Focus the OTP input automatically
+        document.querySelector("[name=otpCode]").focus();
+      } catch (err) {
+        toast(err.message || "Could not send code.", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    } else {
+      if (f.newPassword !== f.confirmPassword) {
+        toast("Passwords don't match.", "error");
+        btn.disabled = false;
+        return;
+      }
+      btn.textContent = "Resetting…";
+      try {
+        await api("/api/auth/forgot-password/reset", {
+          method: "POST",
+          body: JSON.stringify({
+            email: userEmail,
+            otpCode: f.otpCode,
+            newPassword: f.newPassword,
+          }),
+        });
+        toast("Password reset successfully. Please log in.");
+        location.hash = "#/login";
+      } catch (err) {
+        toast(err.message || "Reset failed.", "error");
+        btn.disabled = false;
+        btn.textContent = "Reset password →";
+      }
+    }
+  });
+}
+
 // ==================== APPLY ====================
 async function apply() {
-  if (!state.user) { location.hash = '#/register'; return; }
-  location.hash = '#/editor';
+  if (!state.user) {
+    location.hash = "#/register";
+    return;
+  }
+  location.hash = "#/editor";
 }
 
 // ==================== EDITOR DASHBOARD ====================
@@ -439,7 +563,14 @@ async function composer(id) {
   if (!guard(["Editor", "Admin"])) return;
   let post = id
     ? await api(`/api/posts/mine/${id}`)
-    : { title: "", content: "", mainImageUrl: "", categories: [], tags: [], images: [] };
+    : {
+        title: "",
+        content: "",
+        mainImageUrl: "",
+        categories: [],
+        tags: [],
+        images: [],
+      };
   const curImg = post.mainImageUrl || "";
 
   shell(`<section class="editor-page wrap">
@@ -494,8 +625,13 @@ async function composer(id) {
     const end = ta.selectionEnd;
     const selected = ta.value.slice(start, end);
     const text = ta.value;
-    ta.value = text.slice(0, start) + before + selected + after + text.slice(end);
-    if (selected) ta.setSelectionRange(start + before.length, start + before.length + selected.length);
+    ta.value =
+      text.slice(0, start) + before + selected + after + text.slice(end);
+    if (selected)
+      ta.setSelectionRange(
+        start + before.length,
+        start + before.length + selected.length,
+      );
     else ta.setSelectionRange(start + before.length, start + before.length);
     ta.focus();
   }
@@ -555,16 +691,23 @@ async function composer(id) {
 
   const payload = (draft) => {
     const content = fields.content.value;
-    const inlineImages = [...content.matchAll(/!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g)]
-      .map(([, alt, url]) => ({ url: url.trim(), caption: alt.trim() || null }));
+    const inlineImages = [
+      ...content.matchAll(/!\[([^\]]*)\]\(((?:https?:\/\/|\/)[^)]+)\)/g),
+    ].map(([, alt, url]) => ({ url: url.trim(), caption: alt.trim() || null }));
 
     return {
       title: fields.title.value,
       content,
       mainImageUrl: fields.image.value,
       images: inlineImages,
-      categories: fields.categories.value.split(",").map((x) => x.trim()).filter(Boolean),
-      tags: fields.tags.value.split(",").map((x) => x.trim()).filter(Boolean),
+      categories: fields.categories.value
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
+      tags: fields.tags.value
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean),
       saveAsDraft: draft,
     };
   };
@@ -578,17 +721,24 @@ async function composer(id) {
     const method = id ? "PUT" : "POST";
     const d = await api(url, { method, body: JSON.stringify(payload(draft)) });
     id ||= d.post?.id;
-    $("#save-state").textContent = draft ? "Draft saved" : "Sent to the editorial desk";
+    $("#save-state").textContent = draft
+      ? "Draft saved"
+      : "Sent to the editorial desk";
     toast(d.message);
     if (!draft) location.hash = "#/editor";
   };
 
-  $("#save").addEventListener("click", () => save(true).catch((e) => toast(e.message, "error")));
-  $("#submit").addEventListener("click", () => save(false).catch((e) => toast(e.message, "error")));
+  $("#save").addEventListener("click", () =>
+    save(true).catch((e) => toast(e.message, "error")),
+  );
+  $("#submit").addEventListener("click", () =>
+    save(false).catch((e) => toast(e.message, "error")),
+  );
 
   Object.values(fields).forEach((f) =>
     f.addEventListener("input", () => {
-      $("#preview").innerHTML = `Live preview<br><b>${esc(fields.title.value || "Your title")}</b>`;
+      $("#preview").innerHTML =
+        `Live preview<br><b>${esc(fields.title.value || "Your title")}</b>`;
     }),
   );
 }
@@ -903,7 +1053,10 @@ function guard(roles) {
     location.hash = "#/login";
     return false;
   }
-  if (roles && !roles.includes(state.user.role)) { location.hash = '#/'; return false; }
+  if (roles && !roles.includes(state.user.role)) {
+    location.hash = "#/";
+    return false;
+  }
   return true;
 }
 
@@ -947,6 +1100,7 @@ async function render() {
     if (route === "/") await home();
     else if (route === "/login") authPage("login");
     else if (route === "/register") authPage("register");
+    else if (route === "/forgot-password") forgotPasswordPage();
     else if (route === "/apply") await apply();
     else if (route === "/editor") await editor();
     else if (route === "/editor/new") await composer();
