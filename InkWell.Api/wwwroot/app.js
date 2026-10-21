@@ -19,22 +19,24 @@ const store = {
 };
 
 function toggleTBR(id, title, image, e) {
-  let list = store.get("library", []);
-  const idx = list.findIndex((x) => x.id === id);
+  let list = store.get('library', []);
+  const idx = list.findIndex(x => String(x.id) === String(id));
+  
   let saved = false;
   if (idx > -1) {
     list.splice(idx, 1);
     toast("Removed from Reading List");
   } else {
-    list.unshift({ id, title, image, state: "Saved", savedAt: Date.now() });
+    list.unshift({ id: String(id), title, image, state: "Saved", savedAt: Date.now() });
     toast("Saved to Reading List");
     saved = true;
-    triggerInkBurst(e);
+    if (e) triggerInkBurst(e);
   }
-  store.set("library", list);
-  $$(`.save-article-btn[data-id="${id}"]`).forEach((btn) => {
-    btn.textContent = saved ? "Saved" : "Save for Later";
-    btn.classList.toggle("saved", saved);
+  
+  store.set('library', list);
+  $$(`.save-article-btn[data-id="${id}"]`).forEach(btn => {
+    btn.textContent = saved ? 'Saved' : 'Save for Later';
+    btn.classList.toggle('saved', saved);
   });
   return saved;
 }
@@ -310,6 +312,9 @@ function bindShell() {
 // ==================== POST CARD (Cleaned) ====================
 function card(p) {
   const authorName = p.author.displayName || p.author.username;
+
+  const isSaved = store.get('library', []).some(x => String(x.id) === String(p.id));
+  
   return `<article class="post-card fade-in-up">
     <a class="cover ${p.mainImageUrl ? "" : "gradient"}" href="#/post/${p.id}">
       ${p.mainImageUrl ? `<img loading="lazy" src="${esc(p.mainImageUrl)}" alt="">` : "<span>✦</span>"}
@@ -486,7 +491,7 @@ async function postPage(id) {
     const p = await api(`/api/posts/${id}`);
     document.title = `${p.title} — InkWell`;
 
-    const isSaved = store.get("library", []).some((x) => x.id === p.id);
+    const isSaved = store.get("library", []).some((x) => String(x.id) === String(p.id));
 
     // Extract TOC
     const toc = [];
