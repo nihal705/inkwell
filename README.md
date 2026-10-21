@@ -11,15 +11,21 @@ Built with .NET 10, EF Core, Neon PostgreSQL, Cloudinary, and a vanilla JavaScri
 ## Features
 
 - **Public magazine**: read articles without an account. Category pages, search, and author profiles.
+- **Premium Reading Experience**:
+  - **Focus Mode (Zen)**: hides sidebars and centers the article with light, sepia, or dark themes.
+  - **Text-to-Speech (Listen)**: reads articles aloud paragraph-by-paragraph with active highlighting.
+  - **Private Highlights**: select text to highlight, copy quotes, or undo highlights (stored locally).
+  - **Saved Library**: bookmark posts to a local reading list accessible from the navbar.
+- **Dynamic Content**: Filter by categories or tags. Admins can create new categories on the fly while writing.
 - **Open registration**: anyone can sign up and start writing right away.
 - **Editorial workflow**: submissions from writers go through admin review before publishing. Admin posts publish instantly.
 - **Rejection feedback**: admins can return posts with notes, and writers can revise and resubmit.
 - **Admin dashboard**: pending posts queue, community overview, and stats.
 - **Writer dashboard**: drafts, in-review, published, and rejected stories in one place.
 - **Profile system**: display name, bio, profession, studies, location, website, Twitter, LinkedIn, and avatar.
-- **Image uploads**: Cloudinary-powered cover images and profile pictures.
+- **Image uploads**: Cloudinary-powered cover images, inline images, and profile pictures.
 - **Share bar**: WhatsApp, X, Facebook, LinkedIn, and copy link.
-- **Light/dark theme**, keyboard search (`Ctrl+K`), back-to-top button, and a fully responsive layout.
+- **UI/UX**: Light/dark theme, keyboard search (`Ctrl+K`), back-to-top button, reading progress bar, and subtle fade/ink-burst animations.
 
 ---
 
