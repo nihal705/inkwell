@@ -626,22 +626,24 @@ async function postPage(id) {
 
     // 4. TTS (Listen)
     const articleContent = $("#article-content");
-    let ttsBlocks = [];
-    let currentTtsIndex = 0;
-    let isTtsPlaying = false;
-    let isTtsPaused = false;
+    let ttsBlocks = []; let currentTtsIndex = 0; let isTtsPlaying = false; let isTtsPaused = false;
+    let ignoreNextTtsClick = false; 
 
     function initTTS() {
-      // Select text blocks to read
-      const nodes = articleContent.querySelectorAll(
-        "p, h2, h3, blockquote, li",
-      );
+      const nodes = articleContent.querySelectorAll('p, h2, h3, blockquote, li');
       ttsBlocks = Array.from(nodes);
       ttsBlocks.forEach((node, index) => {
-        node.classList.add("tts-node");
-        // Click a paragraph to start reading from there
-        node.addEventListener("click", (e) => {
-          if (window.getSelection().toString().trim().length > 0) return; // Don't trigger if selecting text
+        node.classList.add('tts-node');
+        node.addEventListener('click', (e) => {
+          // If the user was just highlighting, don't play TTS
+          if (ignoreNextTtsClick) {
+            ignoreNextTtsClick = false;
+            return;
+          }
+          // If text is currently selected, don't play TTS
+          const sel = window.getSelection();
+          if (sel && sel.type === 'Range' && sel.toString().trim().length > 0) return;
+          
           startTTS(index);
         });
       });
@@ -715,42 +717,42 @@ async function postPage(id) {
     initTTS();
 
     // 5. Highlights
-    const toolbar = $("#highlight-toolbar");
-    let currentRange = null;
-    store
-      .get("highlights", [])
-      .filter((h) => h.postId === p.id)
-      .forEach((h) => applyHighlight(h.text));
+    const toolbar = $("#highlight-toolbar"); let currentRange = null;
+    store.get('highlights', []).filter(h => h.postId === p.id).forEach(h => applyHighlight(h.text));
+    
+    // Stop clicks inside the toolbar from bubbling down to the article
+    toolbar.addEventListener('click', (e) => e.stopPropagation());
 
-    document.getElementById("article-root").addEventListener("mouseup", (e) => {
+    document.getElementById('article-root').addEventListener('mouseup', (e) => {
       if (toolbar.contains(e.target)) return;
       setTimeout(() => {
         const selection = window.getSelection();
         if (!selection.isCollapsed && selection.toString().trim().length > 0) {
-          const range = selection.getRangeAt(0);
-          if (articleContent.contains(range.commonAncestorContainer)) {
-            currentRange = range;
-            const rect = range.getBoundingClientRect();
-            toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
-            toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
-            toolbar.classList.add("active");
-            $("#btn-highlight").style.display = "block";
-            $("#btn-undo-highlight").style.display = "none";
-          }
+          ignoreNextTtsClick = true;
+          
+          currentRange = selection.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
+          toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
+          toolbar.classList.add('active');
+          $("#btn-highlight").style.display = 'block';
+          $("#btn-undo-highlight").style.display = 'none';
         }
       }, 10);
     });
 
-    articleContent.addEventListener("click", (e) => {
-      const mark = e.target.closest("mark.inkwell-highlight");
+    articleContent.addEventListener('click', (e) => {
+      const mark = e.target.closest('mark.inkwell-highlight');
       if (mark && window.getSelection().isCollapsed) {
+        ignoreNextTtsClick = true;
+        
         currentRange = null;
         const rect = mark.getBoundingClientRect();
         toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
         toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
-        toolbar.classList.add("active");
-        $("#btn-highlight").style.display = "none";
-        $("#btn-undo-highlight").style.display = "block";
+        toolbar.classList.add('active');
+        $("#btn-highlight").style.display = 'none';
+        $("#btn-undo-highlight").style.display = 'block';
         toolbar.dataset.markId = mark.id || `mark-${Date.now()}`;
         if (!mark.id) mark.id = toolbar.dataset.markId;
       }
@@ -762,14 +764,11 @@ async function postPage(id) {
 
     $("#btn-highlight")?.addEventListener("click", (e) => {
       if (!currentRange) return;
-      const text = currentRange.toString();
-      applyHighlight(text);
-      let list = store.get("highlights", []);
-      list.push({ postId: p.id, text, timestamp: Date.now() });
-      store.set("highlights", list);
-      triggerInkBurst(e);
-      window.getSelection().removeAllRanges();
-      toolbar.classList.remove("active");
+      const text = currentRange.toString(); applyHighlight(text);
+      let list = store.get('highlights', []); list.push({ postId: p.id, text, timestamp: Date.now() }); store.set('highlights', list);
+      triggerInkBurst(e); 
+      window.getSelection().removeAllRanges(); 
+      toolbar.classList.remove('active'); 
       toast("Highlight saved");
     });
 
