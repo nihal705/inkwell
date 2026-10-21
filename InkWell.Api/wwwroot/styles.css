@@ -1768,3 +1768,289 @@ label small {
 .promo-btn:hover {
   background: var(--accent);
 }
+
+@media (min-width: 801px) {
+  .sidebar {
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    scrollbar-width: none; /* Firefox */
+    padding-bottom: 20px;
+  }
+  .sidebar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+}
+
+/* === 2. READING PROGRESS BAR === */
+#reading-progress-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: transparent;
+  z-index: 100;
+  pointer-events: none;
+}
+#reading-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.1s ease-out;
+}
+
+/* === 3. FOCUS MODE (ZEN) === */
+.focus-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 6px 12px;
+  border-radius: 99px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  width: 100%;
+  justify-content: center;
+  transition: 0.2s;
+}
+.focus-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+body.focus-mode header,
+body.focus-mode footer,
+body.focus-mode .sidebar,
+body.focus-mode #reading-progress-container {
+  display: none !important;
+}
+body.focus-mode .article-layout {
+  display: block;
+  max-width: 70ch;
+  margin: 40px auto;
+  padding: 0;
+}
+body.focus-mode .article-content {
+  font-size: 1.1rem;
+  line-height: 1.8;
+}
+body.focus-mode .article-cover {
+  width: 100%;
+  border-radius: 0;
+  margin-bottom: 30px;
+}
+
+/* Focus Mode Themes */
+body.focus-sepia {
+  background: #f4ecd8 !important;
+  color: #433422 !important;
+}
+body.focus-sepia .article-content,
+body.focus-sepia .article-head h1,
+body.focus-sepia .deck {
+  color: #433422 !important;
+}
+
+body.focus-dark {
+  background: #12110f !important;
+  color: #f4efe6 !important;
+}
+body.focus-dark .article-content,
+body.focus-dark .article-head h1,
+body.focus-dark .deck {
+  color: #f4efe6 !important;
+}
+
+.focus-exit-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
+  padding: 10px 20px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: bold;
+  box-shadow: var(--shadow);
+  display: none;
+}
+body.focus-mode .focus-exit-btn {
+  display: block;
+}
+
+.focus-themes {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  gap: 10px;
+  background: var(--surface);
+  padding: 10px 20px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  z-index: 100;
+}
+body.focus-mode .focus-themes {
+  display: flex;
+}
+.focus-themes button {
+  border: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+.focus-themes button[data-theme="light"] { background: #faf7f2; border-color: #e7e1d6; }
+.focus-themes button[data-theme="sepia"] { background: #f4ecd8; border-color: #d4c5a9; }
+.focus-themes button[data-theme="dark"] { background: #12110f; border-color: #2c2924; }
+
+mark.inkwell-highlight {
+  background: rgba(250, 204, 21, 0.4);
+  color: inherit;
+  padding: 2px 0;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+mark.inkwell-highlight:hover {
+  background: rgba(250, 204, 21, 0.7);
+}
+[data-theme="dark"] mark.inkwell-highlight {
+  background: rgba(250, 204, 21, 0.25);
+}
+[data-theme="dark"] mark.inkwell-highlight:hover {
+  background: rgba(250, 204, 21, 0.5);
+}
+
+#highlight-toolbar {
+  position: absolute;
+  z-index: 100;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 6px;
+  border-radius: 8px;
+  display: flex;
+  gap: 4px;
+  box-shadow: var(--shadow);
+  transform: translate(-50%, -100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, transform 0.15s;
+}
+#highlight-toolbar.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -110%);
+}
+#highlight-toolbar button {
+  background: transparent;
+  border: 0;
+  color: var(--paper);
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#highlight-toolbar button:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+/* === 5. BOOKMARK (TBR) BUTTON === */
+.bookmark-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
+  background: rgba(0,0,0,0.5);
+  border: 0;
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: 0.2s;
+  backdrop-filter: blur(4px);
+}
+.bookmark-btn:hover {
+  background: var(--accent);
+  transform: scale(1.1);
+}
+.bookmark-btn.saved {
+  color: var(--accent);
+  background: #fff;
+}
+.bookmark-btn.saved:hover {
+  color: #fff;
+  background: var(--accent);
+}
+
+/* === 6. TEXT-TO-SPEECH ACTIVE === */
+.tts-active {
+  background: var(--soft);
+  border-radius: 4px;
+  box-shadow: 0 0 0 4px var(--soft);
+  transition: background 0.2s;
+}
+
+/* === 7. ANIMATIONS === */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+.ink-burst {
+  position: absolute;
+  pointer-events: none;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: burst 0.6s ease-out forwards;
+}
+@keyframes burst {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 1. Reduce top padding of the layout */
+.article-layout {
+  padding: 20px 0 80px !important; 
+}
+
+/* 2. Reduce spacing around the title */
+.article-head {
+  padding: 10px 0 20px !important;
+}
+
+/* 3. Reduce spacing below the hero image */
+.article-cover {
+  margin: 0 auto 24px !important;
+}
+
+/* 4. Fix TOC clicking (prevents the sticky header from covering the heading) */
+.article-content h1,
+.article-content h2,
+.article-content h3 {
+  scroll-margin-top: 100px;
+}

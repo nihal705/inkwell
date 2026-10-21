@@ -17,13 +17,20 @@ public class PostsController(AppDbContext db) : ControllerBase
         .Include(x => x.PostTags).ThenInclude(x => x.Tag);
 
     [AllowAnonymous, HttpGet]
-    public async Task<IActionResult> List(string? search, string? category, int page = 1)
+    public async Task<IActionResult> List(string? search, string? category, string? tag, int page = 1)
     {
         var q = WithDetails().Where(x => x.Status == "Published");
+        
         if (!string.IsNullOrWhiteSpace(search))
             q = q.Where(x => EF.Functions.ILike(x.Title, $"%{search}%") || EF.Functions.ILike(x.Content, $"%{search}%"));
+            
         if (!string.IsNullOrWhiteSpace(category))
             q = q.Where(x => x.PostCategories.Any(c => c.Category.Name == category || c.Category.Slug == category));
+            
+        // Added tag filtering
+        if (!string.IsNullOrWhiteSpace(tag))
+            q = q.Where(x => x.PostTags.Any(t => t.Tag.Name == tag || t.Tag.Slug == tag));
+            
         var total = await q.CountAsync();
         var posts = await q.OrderByDescending(x => x.PublishedAt).Skip((Math.Max(1, page) - 1) * 9).Take(9).ToListAsync();
         return Ok(new { items = posts.Select(x => ApiMapper.Post(x)), total, page, pageSize = 9 });
@@ -149,23 +156,32 @@ public class PostsController(AppDbContext db) : ControllerBase
     {
         p.PostCategories.Clear();
         p.PostTags.Clear();
-        foreach (var name in dto.Categories.Distinct(StringComparer.OrdinalIgnoreCase))
+        
+        foreach (var name in dto.Categories.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var c = await db.Categories.FirstOrDefaultAsync(x => x.Name == name.Trim());
-            if (c is not null) p.PostCategories.Add(new PostCategory { Category = c });
+            var trimmed = name.Trim();
+            var c = await db.Categories.FirstOrDefaultAsync(x => x.Name == trimmed);
+            
+            // Auto-create category if it doesn't exist
+            if (c is null) 
+            {
+                c = new Category { Name = trimmed, Slug = SeedData.Slug(trimmed) };
+            }
+            p.PostCategories.Add(new PostCategory { Category = c });
         }
+        
         foreach (var name in dto.Tags.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var slug = SeedData.Slug(name);
+            var trimmed = name.Trim();
+            var slug = SeedData.Slug(trimmed);
             var tag = await db.Tags.FirstOrDefaultAsync(x => x.Slug == slug)
-                ?? new Tag { Name = name.Trim(), Slug = slug };
+                ?? new Tag { Name = trimmed, Slug = slug };
             p.PostTags.Add(new PostTag { Tag = tag });
         }
     }
 
     void SetImages(Post p, PostCreateDto dto)
     {
-        // Clear the existing collection; EF will delete old rows and insert new ones
         foreach (var old in p.Images.ToList())
             db.PostImages.Remove(old);
         p.Images.Clear();
