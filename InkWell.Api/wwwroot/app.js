@@ -33,7 +33,7 @@ function toggleTBR(id, title, image, e) {
   }
   store.set("library", list);
   $$(`.save-article-btn[data-id="${id}"]`).forEach((btn) => {
-    btn.textContent = saved ? "🔖 Saved" : "🔖 Save for Later";
+    btn.textContent = saved ? "Saved" : "Save for Later";
     btn.classList.toggle("saved", saved);
   });
   return saved;
@@ -511,15 +511,13 @@ async function postPage(id) {
           </div>
           ${p.categories.length ? `<div class="side-block"><b>Filed under</b>${p.categories.map((c) => `<a href="#/category/${encodeURIComponent(c)}">${esc(c)}</a>`).join("")}</div>` : ""}
           
-          <!-- NEW TOOLS BLOCK -->
           <div class="side-block">
             <b>Tools</b>
-            <button class="focus-btn" id="focus-toggle">🎯 Focus Mode</button>
+            <button class="focus-btn" id="focus-toggle">Focus Mode</button>
             <button class="focus-btn" id="tts-toggle">🎧 Listen to Article</button>
-            <button class="focus-btn save-article-btn ${isSaved ? "saved" : ""}" id="save-article" data-id="${p.id}" data-title="${esc(p.title)}" data-img="${esc(p.mainImageUrl || "")}">${isSaved ? "🔖 Saved" : "🔖 Save for Later"}</button>
+            <button class="focus-btn save-article-btn ${isSaved ? "saved" : ""}" id="save-article" data-id="${p.id}" data-title="${esc(p.title)}" data-img="${esc(p.mainImageUrl || "")}">${isSaved ? "Saved" : "Save for Later"}</button>
           </div>
 
-          <!-- NEW SHARE BLOCK -->
           <div class="side-block">
             <b>Share</b>
             <div class="share-mini">
@@ -543,16 +541,11 @@ async function postPage(id) {
           <div class="article-content" id="article-content">
             ${contentHtml}
             
-            <!-- Moved Tags to bottom of article -->
-            ${
-              p.tags && p.tags.length
-                ? `
+            ${p.tags && p.tags.length ? `
             <div class="tag-list" style="margin-top:40px; margin-bottom: 20px;">
               <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-right:10px">Keywords</span>
               ${p.tags.map((t) => `<a href="#/tag/${encodeURIComponent(t)}" class="tag" style="text-decoration:none">#${esc(t)}</a>`).join("")}
-            </div>`
-                : ""
-            }
+            </div>` : ""}
             
             <hr>
             <div class="author-bio">
@@ -580,52 +573,86 @@ async function postPage(id) {
       </div>
     `);
 
-    // 1. Save Article
+    // 1. Reading Progress, TBR & Sidebar Sync
+    const progressBar = $("#reading-progress-bar");
+    const articleContent = $("#article-content");
+    const leftSidebar = $(".sidebar-left");
+    const rightSidebar = $(".sidebar-right");
+
+    window.onscroll = () => {
+      if (!articleContent) return;
+      
+      // Progress Bar
+      const rect = articleContent.getBoundingClientRect();
+      const totalHeight = articleContent.scrollHeight - window.innerHeight;
+      const scrolled = Math.max(0, -rect.top);
+      const progress = Math.min(100, Math.max(0, (scrolled / totalHeight) * 100));
+      if (progressBar) progressBar.style.width = `${progress}%`;
+
+      // TBR Auto-tracking
+      if (progress > 10 && progress < 90) {
+        let list = store.get('library', []);
+        const item = list.find(x => x.id === p.id);
+        if (item && item.state === "Saved") {
+          item.state = "In progress";
+          store.set('library', list);
+        }
+      } else if (progress >= 90) {
+        let list = store.get('library', []);
+        const item = list.find(x => x.id === p.id);
+        if (item && item.state !== "Finished") {
+          item.state = "Finished";
+          store.set('library', list);
+          toast("Marked as Finished");
+        }
+      }
+
+      // Sidebar Sync
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const scrollFraction = maxScroll > 0 ? Math.min(1, Math.max(0, window.scrollY / maxScroll)) : 0;
+      
+      if (leftSidebar && leftSidebar.scrollHeight > leftSidebar.clientHeight) {
+        const maxLeftScroll = leftSidebar.scrollHeight - leftSidebar.clientHeight;
+        leftSidebar.scrollTop = scrollFraction * maxLeftScroll;
+      }
+      if (rightSidebar && rightSidebar.scrollHeight > rightSidebar.clientHeight) {
+        const maxRightScroll = rightSidebar.scrollHeight - rightSidebar.clientHeight;
+        rightSidebar.scrollTop = scrollFraction * maxRightScroll;
+      }
+    };
+
+    // 2. Save Article
     $("#save-article")?.addEventListener("click", function (e) {
       toggleTBR(p.id, p.title, p.mainImageUrl, e);
     });
 
-    // 2. Share
+    // 3. Share
     $("#share-copy")?.addEventListener("click", () => {
       navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied."));
     });
 
-    // 3. Focus Mode
+    // 4. Focus Mode
     const focusToggle = $("#focus-toggle");
     const focusExit = $("#focus-exit");
     const enterFocus = () => {
       document.body.classList.add("focus-mode");
-      document.body.classList.add(
-        `focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`,
-      );
+      document.body.classList.add(`focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`);
     };
-    const exitFocus = () =>
-      document.body.classList.remove(
-        "focus-mode",
-        "focus-light",
-        "focus-sepia",
-        "focus-dark",
-      );
+    const exitFocus = () => document.body.classList.remove("focus-mode", "focus-light", "focus-sepia", "focus-dark");
     focusToggle?.addEventListener("click", enterFocus);
     focusExit?.addEventListener("click", exitFocus);
     $$(".focus-themes button").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        document.body.classList.remove(
-          "focus-light",
-          "focus-sepia",
-          "focus-dark",
-        );
+        document.body.classList.remove("focus-light", "focus-sepia", "focus-dark");
         document.body.classList.add(`focus-${e.target.dataset.theme}`);
         localStorage.setItem("inkwell.focusTheme", e.target.dataset.theme);
       });
     });
     document.addEventListener("keydown", function escHandler(e) {
-      if (e.key === "Escape" && document.body.classList.contains("focus-mode"))
-        exitFocus();
+      if (e.key === "Escape" && document.body.classList.contains("focus-mode")) exitFocus();
     });
 
-    // 4. TTS (Listen)
-    const articleContent = $("#article-content");
+    // 5. TTS (Listen)
     let ttsBlocks = []; let currentTtsIndex = 0; let isTtsPlaying = false; let isTtsPaused = false;
     let ignoreNextTtsClick = false; 
 
@@ -635,15 +662,9 @@ async function postPage(id) {
       ttsBlocks.forEach((node, index) => {
         node.classList.add('tts-node');
         node.addEventListener('click', (e) => {
-          // If the user was just highlighting, don't play TTS
-          if (ignoreNextTtsClick) {
-            ignoreNextTtsClick = false;
-            return;
-          }
-          // If text is currently selected, don't play TTS
+          if (ignoreNextTtsClick) { ignoreNextTtsClick = false; return; }
           const sel = window.getSelection();
           if (sel && sel.type === 'Range' && sel.toString().trim().length > 0) return;
-          
           startTTS(index);
         });
       });
@@ -666,40 +687,26 @@ async function postPage(id) {
       block.scrollIntoView({ behavior: "smooth", block: "center" });
 
       const text = block.innerText.trim();
-      if (!text) {
-        currentTtsIndex++;
-        return playCurrentBlock();
-      }
+      if (!text) { currentTtsIndex++; return playCurrentBlock(); }
 
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       utterance.onend = () => {
         block.classList.remove("tts-active");
-        if (isTtsPlaying && !isTtsPaused) {
-          currentTtsIndex++;
-          playCurrentBlock();
-        }
+        if (isTtsPlaying && !isTtsPaused) { currentTtsIndex++; playCurrentBlock(); }
       };
       window.speechSynthesis.speak(utterance);
     }
 
     function toggleTTS() {
       if (!isTtsPlaying) startTTS(0);
-      else if (isTtsPaused) {
-        window.speechSynthesis.resume();
-        isTtsPaused = false;
-        updateTtsUI();
-      } else {
-        window.speechSynthesis.pause();
-        isTtsPaused = true;
-        updateTtsUI();
-      }
+      else if (isTtsPaused) { window.speechSynthesis.resume(); isTtsPaused = false; updateTtsUI(); }
+      else { window.speechSynthesis.pause(); isTtsPaused = true; updateTtsUI(); }
     }
 
     function stopTTS() {
       window.speechSynthesis.cancel();
-      isTtsPlaying = false;
-      isTtsPaused = false;
+      isTtsPlaying = false; isTtsPaused = false;
       ttsBlocks.forEach((b) => b.classList.remove("tts-active"));
       updateTtsUI();
     }
@@ -716,11 +723,10 @@ async function postPage(id) {
     window.addEventListener("hashchange", stopTTS, { once: true });
     initTTS();
 
-    // 5. Highlights
+    // 6. Highlights
     const toolbar = $("#highlight-toolbar"); let currentRange = null;
     store.get('highlights', []).filter(h => h.postId === p.id).forEach(h => applyHighlight(h.text));
     
-    // Stop clicks inside the toolbar from bubbling down to the article
     toolbar.addEventListener('click', (e) => e.stopPropagation());
 
     document.getElementById('article-root').addEventListener('mouseup', (e) => {
@@ -729,9 +735,11 @@ async function postPage(id) {
         const selection = window.getSelection();
         if (!selection.isCollapsed && selection.toString().trim().length > 0) {
           ignoreNextTtsClick = true;
-          
           currentRange = selection.getRangeAt(0);
-          const rect = range.getBoundingClientRect();
+          
+          // FIXED: changed 'range' to 'currentRange'
+          const rect = currentRange.getBoundingClientRect(); 
+          
           toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
           toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
           toolbar.classList.add('active');
@@ -745,7 +753,6 @@ async function postPage(id) {
       const mark = e.target.closest('mark.inkwell-highlight');
       if (mark && window.getSelection().isCollapsed) {
         ignoreNextTtsClick = true;
-        
         currentRange = null;
         const rect = mark.getBoundingClientRect();
         toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
@@ -789,22 +796,14 @@ async function postPage(id) {
     });
 
     $("#btn-copy")?.addEventListener("click", () => {
-      const textToCopy = currentRange
-        ? currentRange.toString()
-        : document.getElementById(toolbar.dataset.markId)?.textContent;
-      if (textToCopy)
-        navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
+      const textToCopy = currentRange ? currentRange.toString() : document.getElementById(toolbar.dataset.markId)?.textContent;
+      if (textToCopy) navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
       toast("Quote copied");
       toolbar.classList.remove("active");
     });
 
     function applyHighlight(text) {
-      const walker = document.createTreeWalker(
-        articleContent,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false,
-      );
+      const walker = document.createTreeWalker(articleContent, NodeFilter.SHOW_TEXT, null, false);
       let node;
       while ((node = walker.nextNode())) {
         const idx = node.nodeValue.indexOf(text);
@@ -820,32 +819,24 @@ async function postPage(id) {
       }
     }
 
-    // 6. Related Posts & TOC
+    // 7. Related Posts & TOC
     $$(".toc a").forEach((a) =>
       a.addEventListener("click", (e) => {
         e.preventDefault();
-        document
-          .getElementById(a.dataset.toc)
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }),
+        document.getElementById(a.dataset.toc)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      })
     );
 
     try {
       const list = await api("/api/posts?page=1");
       const others = list.items.filter((x) => x.id !== p.id).slice(0, 4);
       $("#related").innerHTML = others.length
-        ? others
-            .map(
-              (r) =>
-                `<a class="related-item" href="#/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
-            )
-            .join("")
+        ? others.map((r) => `<a class="related-item" href="#/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`).join("")
         : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
     } catch {}
+
   } catch (e) {
-    shell(
-      `<section class="wrap page-head">${empty(e.message, "Back home", "#/")}</section>`,
-    );
+    shell(`<section class="wrap page-head">${empty(e.message, "Back home", "#/")}</section>`);
   }
 }
 
