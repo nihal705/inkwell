@@ -19,24 +19,28 @@ const store = {
 };
 
 function toggleTBR(id, title, image, e) {
-  let list = store.get('library', []);
-  const idx = list.findIndex(x => String(x.id) === String(id));
-  
+  let list = store.get("library", []);
+  const idx = list.findIndex((x) => String(x.id) === String(id));
   let saved = false;
   if (idx > -1) {
     list.splice(idx, 1);
     toast("Removed from Reading List");
   } else {
-    list.unshift({ id: String(id), title, image, state: "Saved", savedAt: Date.now() });
+    list.unshift({
+      id: String(id),
+      title,
+      image,
+      state: "Saved",
+      savedAt: Date.now(),
+    });
     toast("Saved to Reading List");
     saved = true;
     if (e) triggerInkBurst(e);
   }
-  
-  store.set('library', list);
-  $$(`.save-article-btn[data-id="${id}"]`).forEach(btn => {
-    btn.textContent = saved ? 'Saved' : 'Save for Later';
-    btn.classList.toggle('saved', saved);
+  store.set("library", list);
+  $$(`.save-article-btn[data-id="${id}"]`).forEach((btn) => {
+    btn.textContent = saved ? "Saved" : "Save for Later";
+    btn.classList.toggle("saved", saved);
   });
   return saved;
 }
@@ -50,7 +54,6 @@ function triggerInkBurst(e) {
   )
     return;
   const btn = e.currentTarget;
-  if (!btn) return;
   const rect = btn.getBoundingClientRect();
   for (let i = 0; i < 5; i++) {
     const p = document.createElement("div");
@@ -100,7 +103,7 @@ async function uploadImage(file) {
   return data.secure_url;
 }
 
-// ==================== HELPERS ====================
+// ==================== HELPERS & SEO ====================
 const esc = (s) =>
   String(s || "").replace(
     /[&<>'"]/g,
@@ -141,6 +144,23 @@ function toast(message, type = "") {
   setTimeout(() => (t.className = ""), 3600);
 }
 
+function updateMeta(title, description, image) {
+  document.title = title;
+  const setMeta = (attr, key, val) => {
+    let el = document.querySelector(`meta[${attr}="${key}"]`);
+    if (!el) {
+      el = document.createElement("meta");
+      el.setAttribute(attr, key);
+      document.head.appendChild(el);
+    }
+    el.setAttribute("content", val);
+  };
+  setMeta("name", "description", description);
+  setMeta("property", "og:title", title);
+  setMeta("property", "og:description", description);
+  if (image) setMeta("property", "og:image", image);
+}
+
 async function api(url, options = {}) {
   const headers = {
     "Content-Type": "application/json",
@@ -167,7 +187,6 @@ async function api(url, options = {}) {
 const state = {
   user: JSON.parse(localStorage.getItem("inkwell_user") || "null"),
   token: localStorage.getItem("inkwell_token"),
-  posts: [],
   categories: [],
   cloudinary: null,
   theme:
@@ -188,11 +207,10 @@ function logout() {
   state.token = null;
   localStorage.removeItem("inkwell_token");
   localStorage.removeItem("inkwell_user");
-  location.hash = "#/";
+  navigate("/");
   toast("You are signed out.");
 }
 
-// FIXED: Automatically injects IDs into headings so TOC works perfectly
 function markdown(text) {
   return esc(text)
     .replace(
@@ -216,62 +234,106 @@ function markdown(text) {
     .join("");
 }
 
-// ==================== HOUSE ADS ====================
-function renderAd() {
-  const ads = {
-    mycodendotes: `
-      <div class="promo-card">
-        <div class="promo-img" style="background-image: url('/assets/mycodenotes.png');"></div>
-        <div class="promo-content">
-          <span class="promo-tag">Creator's Pick</span>
-          <h3>MyCodeNotes</h3>
-          <p>A structured learning hub for DSA, web dev, and quick notes. Features NextraAI, LeetCode solutions, and more.</p>
-          <a href="https://mycodenotes.dev" target="_blank" class="promo-btn">Visit Site →</a>
-        </div>
-      </div>
-    `,
-    kwikcric: `
-      <div class="promo-card">
-        <div class="promo-img" style="background-image: url('/assets/kwikcric.png');"></div>
-        <div class="promo-content">
-          <span class="promo-tag">Creator's Pick</span>
-          <h3>KwikCric</h3>
-          <p>A comprehensive cricket platform combining extensive stats, interactive games, tournament history, and player rankings.</p>
-          <a href="https://kwikcric.vercel.app" target="_blank" class="promo-btn">Explore KwikCric→</a>
-        </div>
-      </div>
-    `,
-  };
-  const adKeys = Object.keys(ads);
-  return ads[adKeys[Math.floor(Math.random() * adKeys.length)]];
+// ==================== LOCAL FALLBACK SUMMARIZER ====================
+function generateSummary(content) {
+  let text = content
+    .replace(/!\[.*?\]\(.*?\)/g, "")       
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") 
+    .replace(/^#+\s+.*$/gm, "")            
+    .replace(/^\s*[-*+]\s+/gm, "")         
+    .replace(/[#*_>`]/g, "")               
+    .replace(/\n+/g, " ")                  
+    .trim();
+
+  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+  if (sentences.length <= 4) return sentences.join(" ");
+
+  const stopWords = new Set(["the", "and", "a", "to", "of", "in", "i", "is", "that", "it", "on", "you", "this", "for", "but", "with", "are", "have", "be", "at", "or", "as", "was", "so", "if", "out", "not", "we", "they", "he", "she", "my", "our"]);
+  const wordFreq = {};
+  const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+  
+  words.forEach(word => {
+    if (!stopWords.has(word) && word.length > 2) {
+      wordFreq[word] = (wordFreq[word] || 0) + 1;
+    }
+  });
+
+  const sentenceScores = sentences.map((sentence, index) => {
+    const sentenceWords = sentence.toLowerCase().match(/\b\w+\b/g) || [];
+    let score = 0;
+    sentenceWords.forEach(word => {
+      if (wordFreq[word]) score += wordFreq[word];
+    });
+    score = score / (sentenceWords.length || 1);
+    if (index < 2) score *= 1.3;
+    return { sentence: sentence.trim(), score, index };
+  });
+
+  const sentenceCount = Math.min(8, Math.max(3, Math.ceil(sentences.length * 0.3)));
+
+  const topSentences = sentenceScores
+    .sort((a, b) => b.score - a.score)
+    .slice(0, sentenceCount)
+    .sort((a, b) => a.index - b.index)
+    .map(s => s.sentence);
+
+  return topSentences.join(" ");
 }
 
-// ==================== SHELL ====================
+// ==================== HOUSE ADS ====================
+function renderAd(specificKey = null) {
+  const ads = {
+    mycodendotes: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/mycodenotes.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>MyCodeNotes</h3><p>A structured learning hub for DSA, web dev, and quick notes.</p><a href="https://mycodenotes.dev" target="_blank" class="promo-btn">Visit Site →</a></div></div>`,
+    kwikcric: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/kwikcric.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>KwikCric</h3><p>A comprehensive cricket platform combining extensive stats and interactive games.</p><a href="https://kwikcric.vercel.app" target="_blank" class="promo-btn">Explore KwikCric →</a></div></div>`,
+  };
+  const adKeys = Object.keys(ads);
+  const key = specificKey || adKeys[Math.floor(Math.random() * adKeys.length)];
+  return ads[key];
+}
+
+// ==================== ROUTER & SHELL ====================
+function navigate(url) {
+  history.pushState(null, "", url);
+  render();
+}
+
+document.addEventListener("click", (e) => {
+  const a = e.target.closest("a");
+  if (a && a.href && a.origin === location.origin && !a.target) {
+    const url = new URL(a.href);
+    if (url.pathname === location.pathname && url.hash) return;
+    if (url.pathname !== location.pathname || url.search !== location.search) {
+      e.preventDefault();
+      navigate(url.pathname + url.search);
+    }
+  }
+});
+
+window.addEventListener("popstate", render);
+
 function shell(content) {
   const u = state.user;
   app.innerHTML = `
     <header>
       <nav class="nav wrap">
-        <a class="brand" href="#/" aria-label="InkWell home"><span class="nib">✦</span>Ink<span>Well</span></a>
+        <a class="brand" href="/" aria-label="InkWell home"><span class="nib">✦</span>Ink<span>Well</span></a>
         <button class="mobile-menu" aria-label="Open menu">☰</button>
         <div class="nav-links">
-          <a href="#/">Home</a>
-          <a href="#/categories">Categories</a>
-          <a href="#/library">Saved</a>
-          <a href="#/about">About</a>
+          <a href="/">Home</a><a href="/categories">Categories</a><a href="/library">Saved</a><a href="/about">About</a>
         </div>
         <div class="nav-actions">
+          <button class="icon" id="random-post" title="Surprise me">🎲</button>
           <button class="icon" id="search-button" aria-label="Search">⌕</button>
           <button class="icon" id="theme" aria-label="Change theme">${state.theme === "dark" ? "☀" : "☾"}</button>
           ${
             u
               ? `
-            <a class="avatar" href="#/profile" title="Profile">${u.profilePictureUrl ? `<img src="${esc(u.profilePictureUrl)}" alt="">` : initials(u)}</a>
+            <a class="avatar" href="/profile" title="Profile">${u.profilePictureUrl ? `<img src="${esc(u.profilePictureUrl)}" alt="">` : initials(u)}</a>
             <button class="link-button" id="logout">Log out</button>
           `
               : `
-            <a href="#/login">Log in</a>
-            <a class="button small" href="#/register">Start writing</a>
+            <a href="/login">Log in</a>
+            <a class="button small" href="/register">Start writing</a>
           `
           }
         </div>
@@ -280,10 +342,10 @@ function shell(content) {
     <main id="main">${content}</main>
     <footer>
       <div class="wrap footer-grid">
-        <div><a class="brand" href="#/">Ink<span>Well</span></a><p>Where readers become writers.</p></div>
-        <div><b>Explore</b><a href="#/">Latest stories</a><a href="#/categories">Categories</a><a href="#/library">Saved</a></div>
-        <div><b>Write</b>${u ? `<a href="#/editor/new">New article</a><a href="#/editor">Dashboard</a>` : `<a href="#/register">Start writing</a>`}</div>
-        <div><b>Legal</b><a href="#/about">About InkWell</a><a href="mailto:hello@inkwell.local">Contact</a></div>
+        <div><a class="brand" href="/">Ink<span>Well</span></a><p>Where readers become writers.</p></div>
+        <div><b>Explore</b><a href="/">Latest stories</a><a href="/categories">Categories</a><a href="/library">Saved</a></div>
+        <div><b>Write</b>${u ? `<a href="/editor/new">New article</a><a href="/editor">Dashboard</a>` : `<a href="/register">Start writing</a>`}</div>
+        <div><b>Legal</b><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/contact">Contact</a></div>
       </div>
       <div class="wrap fineprint">© ${new Date().getFullYear()} InkWell. Made for considered writing.</div>
     </footer>
@@ -307,79 +369,107 @@ function bindShell() {
   $("#back-top")?.addEventListener("click", () =>
     window.scrollTo({ top: 0, behavior: "smooth" }),
   );
+
+  $("#random-post")?.addEventListener("click", async () => {
+    try {
+      const d = await api("/api/posts/random");
+      if (d.id) navigate(`/post/${d.id}`);
+    } catch {
+      toast("No posts found");
+    }
+  });
 }
 
-// ==================== POST CARD (Cleaned) ====================
+// ==================== POST CARD ====================
 function card(p) {
   const authorName = p.author.displayName || p.author.username;
-
-  const isSaved = store.get('library', []).some(x => String(x.id) === String(p.id));
-  
   return `<article class="post-card fade-in-up">
-    <a class="cover ${p.mainImageUrl ? "" : "gradient"}" href="#/post/${p.id}">
+    <a class="cover ${p.mainImageUrl ? "" : "gradient"}" href="/post/${p.id}">
       ${p.mainImageUrl ? `<img loading="lazy" src="${esc(p.mainImageUrl)}" alt="">` : "<span>✦</span>"}
     </a>
     <div class="card-body">
       <div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div>
-      <h3><a href="#/post/${p.id}">${esc(p.title)}</a></h3>
+      <h3><a href="/post/${p.id}">${esc(p.title)}</a></h3>
       <p class="card-excerpt">${esc(p.excerpt)}</p>
       <div class="byline">
         <span class="mini-avatar">${avatarImg(p.author)}</span>
-        <span><a href="#/author/${p.author.id}">${esc(authorName)}</a> · ${date(p.publishedAt || p.createdAt)}</span>
+        <span><a href="/author/${p.author.id}">${esc(authorName)}</a> · ${date(p.publishedAt || p.createdAt)}</span>
         <span>${p.readingTimeMinutes} min</span>
       </div>
-      <a class="card-read-more" href="#/post/${p.id}">Read article <span>→</span></a>
+      <a class="card-read-more" href="/post/${p.id}">Read article <span>→</span></a>
     </div>
   </article>`;
 }
 
-// ==================== LIBRARY (Saved Posts) ====================
-function libraryPage() {
-  const saved = store.get("library", []);
-  shell(`
-    <section class="page-head wrap">
-      <div class="eyebrow">Your reading list</div>
-      <h1>Saved Stories</h1>
-      <p>Stories you've saved to read later. Stored locally on this device.</p>
-    </section>
-    <section class="wrap post-grid" id="lib-posts">
-      ${
-        saved.length
-          ? saved
-              .map(
-                (item) => `
-        <article class="post-card fade-in-up">
-          <a class="cover ${item.image ? "" : "gradient"}" href="#/post/${item.id}">
-            ${item.image ? `<img loading="lazy" src="${esc(item.image)}" alt="">` : "<span>✦</span>"}
-          </a>
-          <div class="card-body">
-            <div class="eyebrow">${item.state}</div>
-            <h3><a href="#/post/${item.id}">${esc(item.title)}</a></h3>
-            <div class="byline" style="margin-top:20px">
-              <span>Saved ${date(item.savedAt)}</span>
-              <button class="link-button remove-lib" data-id="${item.id}" style="margin-left:auto;color:var(--danger)">Remove</button>
-            </div>
+// ==================== SHARE SUMMARY MODAL ====================
+function openSummaryModal(title, author, summary) {
+  const modal = document.createElement("div");
+  modal.className = "modal-backdrop";
+  modal.innerHTML = `
+    <div class="summary-modal">
+      <h2>Article Summary</h2>
+      <p class="muted">Download the image or share directly to your socials.</p>
+      
+      <div class="summary-preview-box" id="share-preview-target">
+        <div class="summary-card">
+          <h3 class="summary-title">${esc(title)}</h3>
+          <p class="summary-text">${esc(summary)}</p>
+          <div class="summary-footer">
+            <span class="summary-author">— ${esc(author)}</span>
+            <a href="https://inkwell-3m7y.onrender.com" target="_blank" class="summary-url">inkwell-3m7y.onrender.com</a>
+            <span class="summary-brand">✦ InkWell</span>
           </div>
-        </article>
-      `,
-              )
-              .join("")
-          : empty("Your reading list is empty.", "Explore stories", "#/")
-      }
-    </section>
-  `);
+        </div>
+      </div>
 
-  $$(".remove-lib").forEach((btn) => {
-    btn.onclick = (e) => {
-      e.preventDefault();
-      toggleTBR(btn.dataset.id, "", "", e);
-      libraryPage();
-    };
-  });
+      <div class="summary-actions">
+        <button class="button secondary" id="btn-download">Download</button>
+        <button class="button" id="btn-native-share">Share</button>
+        <button class="button danger" onclick="this.closest('.modal-backdrop').remove()">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const target = $("#share-preview-target", modal);
+
+  $("#btn-download", modal).onclick = async () => {
+    if (typeof htmlToImage === 'undefined') return toast("Image library not loaded yet.", "error");
+    try {
+      toast("Generating image...");
+      const dataUrl = await htmlToImage.toPng(target, { quality: 1.0, pixelRatio: 2 });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = "inkwell-summary.png";
+      a.click();
+      toast("Image downloaded!");
+    } catch (err) { toast("Failed to generate image", "error"); }
+  };
+
+  $("#btn-native-share", modal).onclick = async () => {
+    if (typeof htmlToImage === 'undefined') return toast("Image library not loaded yet.", "error");
+    try {
+      const dataUrl = await htmlToImage.toPng(target, { quality: 1.0, pixelRatio: 2 });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], "summary.png", { type: "image/png" });
+      
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: "InkWell Summary", text: `"${title}" — ${author}` });
+      } else {
+        toast("Native sharing not supported. Download instead.", "error");
+      }
+    } catch (err) { console.error(err); }
+  };
 }
 
-// ==================== HOME & CATEGORIES ====================
+// ==================== HOME ====================
 async function home() {
+  updateMeta(
+    "InkWell — Where readers become writers",
+    "A digital magazine for readers with curiosity and writers with something worth saying.",
+    "https://images.unsplash.com/photo-1455390582262-044cdead2708?auto=format&fit=crop&w=1200&q=80",
+  );
+
   shell(`
     <section class="hero wrap">
       <div class="hero-copy">
@@ -388,15 +478,12 @@ async function home() {
         <p>Ideas worth sitting with, stories worth sharing, and a welcoming room for your next piece of work.</p>
         <div class="actions">
           <a class="button" href="#articles">Start reading <span>→</span></a>
-          <a class="button secondary" href="${state.user ? "#/editor/new" : "#/register"}">${state.user ? "Continue writing" : "Start writing"}</a>
+          <a class="button secondary" href="${state.user ? "/editor/new" : "/register"}">${state.user ? "Continue writing" : "Start writing"}</a>
         </div>
       </div>
-      <div class="hero-art">
-        <div class="orb"></div>
-        <div class="paper-note">MAKE ROOM<br>FOR IDEAS <b>↗</b></div>
-        <span class="spark one">✦</span><span class="spark two">✦</span>
-      </div>
+      <div class="hero-art"><div class="orb"></div><div class="paper-note">MAKE ROOM<br>FOR IDEAS <b>↗</b></div><span class="spark one">✦</span><span class="spark two">✦</span></div>
     </section>
+
     <section class="wrap category-bar" id="category-bar"></section>
     <section class="wrap" id="articles">
       <div class="section-heading">
@@ -407,7 +494,7 @@ async function home() {
     </section>
     <section class="cta wrap">
       <div><div class="eyebrow">Your perspective matters</div><h2>Have something to say?</h2><p>Write your next article and share it with a community of curious readers.</p></div>
-      <a class="button pale" href="${state.user ? "#/editor/new" : "#/register"}">${state.user ? "Write an article" : "Start writing"} →</a>
+      <a class="button pale" href="${state.user ? "/editor/new" : "/register"}">${state.user ? "Write an article" : "Start writing"} →</a>
     </section>
   `);
 
@@ -417,23 +504,78 @@ async function home() {
       api("/api/posts"),
     ]);
     state.categories = cats;
-    state.posts = data.items;
+    const displayPosts = data.items.slice(0, 6);
     $("#category-bar").innerHTML =
-      `<a class="chip active" href="#/">All stories</a>${cats.map((c) => `<a class="chip" href="#/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
+      `<a class="chip active" href="/">All stories</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
     $("#posts").innerHTML = data.items.length
       ? data.items.map(card).join("")
-      : empty("No articles match that search.", "Clear filters", "#/");
+      : empty("No articles match that search.", "Clear filters", "/");
+    
   } catch (e) {
     $("#posts").innerHTML = empty(
       "The library is waking up.",
       "Try again",
-      "#/",
+      "/",
     );
   }
   $("#open-search")?.addEventListener("click", searchModal);
 }
 
+// ==================== STATIC PAGES ====================
+function aboutPage() {
+  updateMeta("About — InkWell", "The story behind InkWell.");
+  shell(
+    `<section class="wrap page-head about"><div class="eyebrow">Idea</div><h1>A better room for the written word.</h1><p>InkWell is a digital magazine for readers with curiosity and writers with something worth saying. Every story passes through an editorial review before it becomes part of the public library.</p><a class="button" href="/apply">Write for InkWell →</a></section>`,
+  );
+}
+
+function privacyPage() {
+  updateMeta("Privacy Policy — InkWell", "How InkWell handles your data.");
+  shell(`<section class="wrap page-head about"><div class="eyebrow">Legal</div><h1>Privacy Policy</h1>
+    <p><strong>Last updated:</strong> ${new Date().toLocaleDateString()}</p>
+    <p>At InkWell, we take your privacy seriously. Here is how we handle your data:</p>
+    <ul style="line-height:1.8; margin-bottom:40px; margin-left:20px;">
+      <li><strong>Authentication:</strong> We use JWT tokens and BCrypt hashing to keep your account secure. We do not sell your data.</li>
+      <li><strong>Content:</strong> Articles and images you upload are stored on our secure PostgreSQL database and Cloudinary.</li>
+      <li><strong>Local Storage:</strong> Reader features like Highlights, the Saved Library, and Focus Mode preferences are stored entirely on your device, not on our servers.</li>
+    </ul>
+  </section>`);
+}
+
+function contactPage() {
+  updateMeta("Contact Us — InkWell", "Get in touch with the InkWell team.");
+  shell(`<section class="wrap page-head about"><div class="eyebrow">Get in touch</div><h1>Contact Us</h1>
+    <p>Have a question, found a bug, or want to say hello? Send us a message and it will go directly to our team.</p>
+    <form id="contact-form" class="form" style="margin-top:30px; max-width:500px;">
+      <label>Your Name<input type="text" name="name" required></label>
+      <label>Your Email<input type="email" name="email" required></label>
+      <label>Message<textarea name="message" required minlength="10" style="min-height:120px"></textarea></label>
+      <button class="button" type="submit" style="width:100%; margin-top:15px">Send Message →</button>
+    </form>
+  </section>`);
+
+  $("#contact-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("button", e.target);
+    btn.disabled = true;
+    btn.textContent = "Sending...";
+    try {
+      const f = Object.fromEntries(new FormData(e.target));
+      await api("/api/contact", { method: "POST", body: JSON.stringify(f) });
+      toast("Message sent successfully!");
+      e.target.reset();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Send Message →";
+    }
+  });
+}
+
+// ==================== CATEGORIES & TAGS ====================
 async function categoriesPage() {
+  updateMeta("Categories — InkWell", "Explore all topics on InkWell.");
   shell(
     `<section class="page-head wrap"><div class="eyebrow">Explore InkWell</div><h1>All categories</h1><p>Find stories by the questions they explore.</p></section><section class="wrap category-grid" id="cat-grid"><div class="skeleton"></div></section>`,
   );
@@ -443,20 +585,21 @@ async function categoriesPage() {
       ? cats
           .map(
             (c) =>
-              `<a class="category-card" href="#/category/${encodeURIComponent(c.name)}"><b>${esc(c.name)}</b><span>${c.postCount || 0} stories</span></a>`,
+              `<a class="category-card" href="/category/${encodeURIComponent(c.name)}"><b>${esc(c.name)}</b><span>${c.postCount || 0} stories</span></a>`,
           )
           .join("")
-      : empty("No categories yet.", "Back home", "#/");
+      : empty("No categories yet.", "Back home", "/");
   } catch (e) {
     $("#cat-grid").innerHTML = empty(
       "Could not load categories.",
       "Try again",
-      "#/categories",
+      "/categories",
     );
   }
 }
 
 async function category(name) {
+  updateMeta(`${name} — InkWell`, `Stories in ${name}.`);
   shell(
     `<section class="page-head wrap"><div class="eyebrow">InkWell category</div><h1>${esc(name)}</h1><p>Stories gathered around one good question.</p></section><section class="wrap post-grid" id="posts"></section>`,
   );
@@ -466,11 +609,12 @@ async function category(name) {
     : empty(
         "No published articles in this category yet.",
         "Explore all stories",
-        "#/",
+        "/",
       );
 }
 
 async function tagPage(name) {
+  updateMeta(`#${name} — InkWell`, `Stories tagged with #${name}.`);
   shell(
     `<section class="page-head wrap"><div class="eyebrow">Keyword</div><h1>#${esc(name)}</h1><p>All stories tagged with ${esc(name)}.</p></section><section class="wrap post-grid" id="posts"><div class="skeleton"></div></section>`,
   );
@@ -480,8 +624,49 @@ async function tagPage(name) {
     : empty(
         "No published articles with this tag yet.",
         "Explore all stories",
-        "#/",
+        "/",
       );
+}
+
+// ==================== LIBRARY ====================
+function libraryPage() {
+  updateMeta("Saved Stories — InkWell", "Your personal reading list.");
+  const saved = store.get("library", []);
+  shell(`
+    <section class="page-head wrap"><div class="eyebrow">Your reading list</div><h1>Saved Stories</h1><p>Stories you've saved to read later. Stored locally on this device.</p></section>
+    <section class="wrap post-grid" id="lib-posts">
+      ${
+        saved.length
+          ? saved
+              .map(
+                (item) => `
+        <article class="post-card fade-in-up">
+          <a class="cover ${item.image ? "" : "gradient"}" href="/post/${item.id}">
+            ${item.image ? `<img loading="lazy" src="${esc(item.image)}" alt="">` : "<span>✦</span>"}
+          </a>
+          <div class="card-body">
+            <div class="eyebrow">${item.state}</div>
+            <h3><a href="/post/${item.id}">${esc(item.title)}</a></h3>
+            <div class="byline" style="margin-top:20px">
+              <span>Saved ${date(item.savedAt)}</span>
+              <button class="link-button remove-lib" data-id="${item.id}" style="margin-left:auto;color:var(--danger)">Remove</button>
+            </div>
+          </div>
+        </article>
+      `,
+              )
+              .join("")
+          : empty("Your reading list is empty.", "Explore stories", "/")
+      }
+    </section>
+  `);
+  $$(".remove-lib").forEach((btn) => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      toggleTBR(btn.dataset.id, "", "", e);
+      libraryPage();
+    };
+  });
 }
 
 // ==================== POST PAGE ====================
@@ -489,41 +674,55 @@ async function postPage(id) {
   shell(`<div class="article-skeleton wrap"></div>`);
   try {
     const p = await api(`/api/posts/${id}`);
-    document.title = `${p.title} — InkWell`;
+    updateMeta(
+      `${p.title} — InkWell`,
+      p.excerpt || "Read this article on InkWell.",
+      p.mainImageUrl,
+    );
 
-    const isSaved = store.get("library", []).some((x) => String(x.id) === String(p.id));
-
-    // Extract TOC
+    const isSaved = store
+      .get("library", [])
+      .some((x) => String(x.id) === String(p.id));
     const toc = [];
-    p.content.replace(/^(##|###) (.+)$/gm, (m, hashes, text) => {
-      toc.push({ level: hashes.length, text, slug: slugify(text) });
-    });
-
+    p.content.replace(/^(##|###) (.+)$/gm, (m, hashes, text) =>
+      toc.push({ level: hashes.length, text, slug: slugify(text) }),
+    );
     const contentHtml = markdown(p.content);
     const shareUrl = location.href;
     const shareText = encodeURIComponent(p.title + " — InkWell");
     const encUrl = encodeURIComponent(shareUrl);
 
+    // --- Generate Two Different Ads for Desktop ---
+    const adKeys = ["mycodendotes", "kwikcric"];
+    const leftAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
+    let rightAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
+    // Force them to be different if there are multiple ads
+    if (adKeys.length > 1) {
+      while (leftAdKey === rightAdKey) {
+        rightAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
+      }
+    }
+
     shell(`
       <div class="wrap article-layout">
         <aside class="sidebar sidebar-left">
           <div class="side-block author-card">
-            <a class="mini-avatar large" href="#/author/${p.author.id}">${avatarImg(p.author)}</a>
-            <div>
-              <a href="#/author/${p.author.id}">${esc(p.author.displayName || p.author.username)}</a>
-              <small>${date(p.publishedAt || p.createdAt)} · ${p.readingTimeMinutes} min read</small>
-            </div>
+            <a class="mini-avatar large" href="/author/${p.author.id}">${avatarImg(p.author)}</a>
+            <div><a href="/author/${p.author.id}">${esc(p.author.displayName || p.author.username)}</a><small>${date(p.publishedAt || p.createdAt)} · ${p.readingTimeMinutes} min read</small></div>
           </div>
-          ${p.categories.length ? `<div class="side-block"><b>Filed under</b>${p.categories.map((c) => `<a href="#/category/${encodeURIComponent(c)}">${esc(c)}</a>`).join("")}</div>` : ""}
+          ${p.categories.length ? `<div class="side-block"><b>Filed under</b>${p.categories.map((c) => `<a href="/category/${encodeURIComponent(c)}">${esc(c)}</a>`).join("")}</div>` : ""}
           
-          <div class="side-block">
+          <!-- TOOLS (Moved on mobile) -->
+          <div class="side-block" id="sidebar-tools">
             <b>Tools</b>
+            <button class="focus-btn" id="summary-btn">Read Summary</button>
             <button class="focus-btn" id="focus-toggle">Focus Mode</button>
             <button class="focus-btn" id="tts-toggle">🎧 Listen to Article</button>
             <button class="focus-btn save-article-btn ${isSaved ? "saved" : ""}" id="save-article" data-id="${p.id}" data-title="${esc(p.title)}" data-img="${esc(p.mainImageUrl || "")}">${isSaved ? "Saved" : "Save for Later"}</button>
           </div>
-
-          <div class="side-block">
+          
+          <!-- SHARE (Moved on mobile) -->
+          <div class="side-block" id="sidebar-share">
             <b>Share</b>
             <div class="share-mini">
               <a href="https://wa.me/?text=${shareText}%20${encUrl}" target="_blank" rel="noopener" title="WhatsApp">W</a>
@@ -534,49 +733,50 @@ async function postPage(id) {
             </div>
           </div>
           
-          ${renderAd()}
+          <div class="ad-container-left">${renderAd(leftAdKey)}</div>
         </aside>
 
         <article class="article-body" id="article-root">
-          <div class="article-head">
-            <div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div>
-            <h1>${esc(p.title)}</h1>
-          </div>
+          <div class="article-head"><div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div><h1>${esc(p.title)}</h1></div>
           ${p.mainImageUrl ? `<img class="article-cover" src="${esc(p.mainImageUrl)}" alt="">` : ""}
           <div class="article-content" id="article-content">
             ${contentHtml}
-            
-            ${p.tags && p.tags.length ? `
-            <div class="tag-list" style="margin-top:40px; margin-bottom: 20px;">
-              <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-right:10px">Keywords</span>
-              ${p.tags.map((t) => `<a href="#/tag/${encodeURIComponent(t)}" class="tag" style="text-decoration:none">#${esc(t)}</a>`).join("")}
-            </div>` : ""}
-            
+            ${p.tags && p.tags.length ? `<div class="tag-list" style="margin-top:40px; margin-bottom: 20px;"><span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-right:10px">Keywords</span>${p.tags.map((t) => `<a href="/tag/${encodeURIComponent(t)}" class="tag" style="text-decoration:none">#${esc(t)}</a>`).join("")}</div>` : ""}
             <hr>
-            <div class="author-bio">
-              <span class="mini-avatar large">${avatarImg(p.author)}</span>
-              <div><b>Written by ${esc(p.author.displayName || p.author.username)}</b><p>${esc(p.author.bio || "A contributing writer at InkWell.")}</p></div>
-            </div>
+            <div class="author-bio"><span class="mini-avatar large">${avatarImg(p.author)}</span><div><b>Written by ${esc(p.author.displayName || p.author.username)}</b><p>${esc(p.author.bio || "A contributing writer at InkWell.")}</p></div></div>
           </div>
         </article>
 
         <aside class="sidebar sidebar-right">
           ${toc.length ? `<div class="side-block"><b>On this page</b><nav class="toc">${toc.map((t) => `<a class="toc-lv${t.level}" href="#${t.slug}" data-toc="${t.slug}">${esc(t.text)}</a>`).join("")}</nav></div>` : ""}
-          <div class="side-block">
-            <b>More from InkWell</b>
-            <div id="related" class="related-list"></div>
-          </div>
+          <div class="side-block"><b>More from InkWell</b><div id="related" class="related-list"></div></div>
+          
+          <div class="ad-container-right">${renderAd(rightAdKey)}</div>
         </aside>
       </div>
       
       <button class="focus-exit-btn" id="focus-exit">Exit Focus Mode (Esc)</button>
       <div class="focus-themes"><button data-theme="light"></button><button data-theme="sepia"></button><button data-theme="dark"></button></div>
-      <div id="highlight-toolbar">
-        <button id="btn-highlight">Highlight</button>
-        <button id="btn-undo-highlight" style="display:none;color:#f87171">Remove</button>
-        <button id="btn-copy">Copy</button>
-      </div>
+      <div id="highlight-toolbar"><button id="btn-highlight">Highlight</button><button id="btn-undo-highlight" style="display:none;color:#f87171">Remove</button><button id="btn-copy">Copy</button></div>
     `);
+
+    // --- Mobile Layout Reordering ---
+    if (window.innerWidth <= 800) {
+      const tools = $("#sidebar-tools");
+      const share = $("#sidebar-share");
+      const content = $("#article-content");
+
+      // 1. Move Share after Author Bio
+      if (share && content) {
+        content.appendChild(share);
+        share.style.marginTop = '40px'; 
+      }
+      // 2. Move Tools right below Share
+      if (tools && content) {
+        content.appendChild(tools);
+        tools.style.marginTop = '16px';
+      }
+    }
 
     // 1. Reading Progress, TBR & Sidebar Sync
     const progressBar = $("#reading-progress-bar");
@@ -586,54 +786,95 @@ async function postPage(id) {
 
     window.onscroll = () => {
       if (!articleContent) return;
-      
-      // Progress Bar
       const rect = articleContent.getBoundingClientRect();
       const totalHeight = articleContent.scrollHeight - window.innerHeight;
       const scrolled = Math.max(0, -rect.top);
-      const progress = Math.min(100, Math.max(0, (scrolled / totalHeight) * 100));
+      const progress = Math.min(
+        100,
+        Math.max(0, (scrolled / totalHeight) * 100),
+      );
       if (progressBar) progressBar.style.width = `${progress}%`;
 
-      // TBR Auto-tracking
       if (progress > 10 && progress < 90) {
-        let list = store.get('library', []);
-        const item = list.find(x => x.id === p.id);
+        let list = store.get("library", []);
+        const item = list.find((x) => x.id === p.id);
         if (item && item.state === "Saved") {
           item.state = "In progress";
-          store.set('library', list);
+          store.set("library", list);
         }
       } else if (progress >= 90) {
-        let list = store.get('library', []);
-        const item = list.find(x => x.id === p.id);
+        let list = store.get("library", []);
+        const item = list.find((x) => x.id === p.id);
         if (item && item.state !== "Finished") {
           item.state = "Finished";
-          store.set('library', list);
+          store.set("library", list);
           toast("Marked as Finished");
         }
       }
 
-      // Sidebar Sync
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      const scrollFraction = maxScroll > 0 ? Math.min(1, Math.max(0, window.scrollY / maxScroll)) : 0;
-      
-      if (leftSidebar && leftSidebar.scrollHeight > leftSidebar.clientHeight) {
-        const maxLeftScroll = leftSidebar.scrollHeight - leftSidebar.clientHeight;
-        leftSidebar.scrollTop = scrollFraction * maxLeftScroll;
-      }
-      if (rightSidebar && rightSidebar.scrollHeight > rightSidebar.clientHeight) {
-        const maxRightScroll = rightSidebar.scrollHeight - rightSidebar.clientHeight;
-        rightSidebar.scrollTop = scrollFraction * maxRightScroll;
-      }
+      const maxScroll =
+        document.documentElement.scrollHeight - window.innerHeight;
+      const scrollFraction =
+        maxScroll > 0
+          ? Math.min(1, Math.max(0, window.scrollY / maxScroll))
+          : 0;
+      if (leftSidebar && leftSidebar.scrollHeight > leftSidebar.clientHeight)
+        leftSidebar.scrollTop =
+          scrollFraction *
+          (leftSidebar.scrollHeight - leftSidebar.clientHeight);
+      if (rightSidebar && rightSidebar.scrollHeight > rightSidebar.clientHeight)
+        rightSidebar.scrollTop =
+          scrollFraction *
+          (rightSidebar.scrollHeight - rightSidebar.clientHeight);
     };
 
-    // 2. Save Article
+    // 2. Save Article & Share
     $("#save-article")?.addEventListener("click", function (e) {
       toggleTBR(p.id, p.title, p.mainImageUrl, e);
     });
-
-    // 3. Share
     $("#share-copy")?.addEventListener("click", () => {
       navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied."));
+    });
+
+    // 3. Generate Summary Logic (AI with Local Fallback)
+    $("#summary-btn")?.addEventListener("click", async () => {
+      const btn = $("#summary-btn");
+      const originalText = btn.innerHTML;
+      
+      // Show loading state
+      btn.innerHTML = "✨ Generating...";
+      btn.disabled = true;
+      btn.style.opacity = "0.7";
+
+      try {
+        // 1. Try calling the Groq AI endpoint
+        const response = await api(`/api/posts/${p.id}/summarize`, {
+          method: "POST"
+        });
+        openSummaryModal(p.title, p.author.displayName || p.author.username, response.summary);
+        
+      } catch (err) {
+        // 2. FALLBACK: If AI fails, use the local JS algorithm
+        console.warn("AI Summary failed, falling back to local algorithm.", err);
+        toast("AI unavailable. Generating local summary...", "error");
+        
+        // Clean the content to remove the title
+        let cleanContent = p.content;
+        const firstLine = cleanContent.split('\n')[0];
+        if (firstLine.includes(p.title) || firstLine.length < p.title.length + 5) {
+            cleanContent = cleanContent.substring(firstLine.length).trim();
+        }
+        
+        // Generate using local function
+        const localSummary = generateSummary(cleanContent);
+        openSummaryModal(p.title, p.author.displayName || p.author.username, localSummary);
+        
+      } finally {
+        // 3. Reset button state no matter what happened
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        btn.style.opacity = "1";
+      }
     });
 
     // 4. Focus Mode
@@ -641,40 +882,61 @@ async function postPage(id) {
     const focusExit = $("#focus-exit");
     const enterFocus = () => {
       document.body.classList.add("focus-mode");
-      document.body.classList.add(`focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`);
+      document.body.classList.add(
+        `focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`,
+      );
     };
-    const exitFocus = () => document.body.classList.remove("focus-mode", "focus-light", "focus-sepia", "focus-dark");
+    const exitFocus = () =>
+      document.body.classList.remove(
+        "focus-mode",
+        "focus-light",
+        "focus-sepia",
+        "focus-dark",
+      );
     focusToggle?.addEventListener("click", enterFocus);
     focusExit?.addEventListener("click", exitFocus);
     $$(".focus-themes button").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        document.body.classList.remove("focus-light", "focus-sepia", "focus-dark");
+        document.body.classList.remove(
+          "focus-light",
+          "focus-sepia",
+          "focus-dark",
+        );
         document.body.classList.add(`focus-${e.target.dataset.theme}`);
         localStorage.setItem("inkwell.focusTheme", e.target.dataset.theme);
       });
     });
     document.addEventListener("keydown", function escHandler(e) {
-      if (e.key === "Escape" && document.body.classList.contains("focus-mode")) exitFocus();
+      if (e.key === "Escape" && document.body.classList.contains("focus-mode"))
+        exitFocus();
     });
 
     // 5. TTS (Listen)
-    let ttsBlocks = []; let currentTtsIndex = 0; let isTtsPlaying = false; let isTtsPaused = false;
-    let ignoreNextTtsClick = false; 
+    let ttsBlocks = [];
+    let currentTtsIndex = 0;
+    let isTtsPlaying = false;
+    let isTtsPaused = false;
+    let ignoreNextTtsClick = false;
 
     function initTTS() {
-      const nodes = articleContent.querySelectorAll('p, h2, h3, blockquote, li');
+      const nodes = articleContent.querySelectorAll(
+        "p, h2, h3, blockquote, li",
+      );
       ttsBlocks = Array.from(nodes);
       ttsBlocks.forEach((node, index) => {
-        node.classList.add('tts-node');
-        node.addEventListener('click', (e) => {
-          if (ignoreNextTtsClick) { ignoreNextTtsClick = false; return; }
+        node.classList.add("tts-node");
+        node.addEventListener("click", (e) => {
+          if (ignoreNextTtsClick) {
+            ignoreNextTtsClick = false;
+            return;
+          }
           const sel = window.getSelection();
-          if (sel && sel.type === 'Range' && sel.toString().trim().length > 0) return;
+          if (sel && sel.type === "Range" && sel.toString().trim().length > 0)
+            return;
           startTTS(index);
         });
       });
     }
-
     function startTTS(index) {
       if (!window.speechSynthesis) return toast("TTS not supported", "error");
       stopTTS();
@@ -684,38 +946,46 @@ async function postPage(id) {
       updateTtsUI();
       playCurrentBlock();
     }
-
     function playCurrentBlock() {
       if (currentTtsIndex >= ttsBlocks.length) return stopTTS();
       const block = ttsBlocks[currentTtsIndex];
       block.classList.add("tts-active");
       block.scrollIntoView({ behavior: "smooth", block: "center" });
-
       const text = block.innerText.trim();
-      if (!text) { currentTtsIndex++; return playCurrentBlock(); }
-
+      if (!text) {
+        currentTtsIndex++;
+        return playCurrentBlock();
+      }
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       utterance.onend = () => {
         block.classList.remove("tts-active");
-        if (isTtsPlaying && !isTtsPaused) { currentTtsIndex++; playCurrentBlock(); }
+        if (isTtsPlaying && !isTtsPaused) {
+          currentTtsIndex++;
+          playCurrentBlock();
+        }
       };
       window.speechSynthesis.speak(utterance);
     }
-
     function toggleTTS() {
       if (!isTtsPlaying) startTTS(0);
-      else if (isTtsPaused) { window.speechSynthesis.resume(); isTtsPaused = false; updateTtsUI(); }
-      else { window.speechSynthesis.pause(); isTtsPaused = true; updateTtsUI(); }
+      else if (isTtsPaused) {
+        window.speechSynthesis.resume();
+        isTtsPaused = false;
+        updateTtsUI();
+      } else {
+        window.speechSynthesis.pause();
+        isTtsPaused = true;
+        updateTtsUI();
+      }
     }
-
     function stopTTS() {
       window.speechSynthesis.cancel();
-      isTtsPlaying = false; isTtsPaused = false;
+      isTtsPlaying = false;
+      isTtsPaused = false;
       ttsBlocks.forEach((b) => b.classList.remove("tts-active"));
       updateTtsUI();
     }
-
     function updateTtsUI() {
       const btn = $("#tts-toggle");
       if (!btn) return;
@@ -723,48 +993,47 @@ async function postPage(id) {
       else if (isTtsPaused) btn.textContent = "▶️ Resume Listening";
       else btn.textContent = "⏸ Pause Listening";
     }
-
     $("#tts-toggle")?.addEventListener("click", toggleTTS);
     window.addEventListener("hashchange", stopTTS, { once: true });
     initTTS();
 
     // 6. Highlights
-    const toolbar = $("#highlight-toolbar"); let currentRange = null;
-    store.get('highlights', []).filter(h => h.postId === p.id).forEach(h => applyHighlight(h.text));
-    
-    toolbar.addEventListener('click', (e) => e.stopPropagation());
+    const toolbar = $("#highlight-toolbar");
+    let currentRange = null;
+    store
+      .get("highlights", [])
+      .filter((h) => h.postId === p.id)
+      .forEach((h) => applyHighlight(h.text));
+    toolbar.addEventListener("click", (e) => e.stopPropagation());
 
-    document.getElementById('article-root').addEventListener('mouseup', (e) => {
+    document.getElementById("article-root").addEventListener("mouseup", (e) => {
       if (toolbar.contains(e.target)) return;
       setTimeout(() => {
         const selection = window.getSelection();
         if (!selection.isCollapsed && selection.toString().trim().length > 0) {
           ignoreNextTtsClick = true;
           currentRange = selection.getRangeAt(0);
-          
-          // FIXED: changed 'range' to 'currentRange'
-          const rect = currentRange.getBoundingClientRect(); 
-          
+          const rect = currentRange.getBoundingClientRect();
           toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
           toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
-          toolbar.classList.add('active');
-          $("#btn-highlight").style.display = 'block';
-          $("#btn-undo-highlight").style.display = 'none';
+          toolbar.classList.add("active");
+          $("#btn-highlight").style.display = "block";
+          $("#btn-undo-highlight").style.display = "none";
         }
       }, 10);
     });
 
-    articleContent.addEventListener('click', (e) => {
-      const mark = e.target.closest('mark.inkwell-highlight');
+    articleContent.addEventListener("click", (e) => {
+      const mark = e.target.closest("mark.inkwell-highlight");
       if (mark && window.getSelection().isCollapsed) {
         ignoreNextTtsClick = true;
         currentRange = null;
         const rect = mark.getBoundingClientRect();
         toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
         toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
-        toolbar.classList.add('active');
-        $("#btn-highlight").style.display = 'none';
-        $("#btn-undo-highlight").style.display = 'block';
+        toolbar.classList.add("active");
+        $("#btn-highlight").style.display = "none";
+        $("#btn-undo-highlight").style.display = "block";
         toolbar.dataset.markId = mark.id || `mark-${Date.now()}`;
         if (!mark.id) mark.id = toolbar.dataset.markId;
       }
@@ -776,11 +1045,14 @@ async function postPage(id) {
 
     $("#btn-highlight")?.addEventListener("click", (e) => {
       if (!currentRange) return;
-      const text = currentRange.toString(); applyHighlight(text);
-      let list = store.get('highlights', []); list.push({ postId: p.id, text, timestamp: Date.now() }); store.set('highlights', list);
-      triggerInkBurst(e); 
-      window.getSelection().removeAllRanges(); 
-      toolbar.classList.remove('active'); 
+      const text = currentRange.toString();
+      applyHighlight(text);
+      let list = store.get("highlights", []);
+      list.push({ postId: p.id, text, timestamp: Date.now() });
+      store.set("highlights", list);
+      triggerInkBurst(e);
+      window.getSelection().removeAllRanges();
+      toolbar.classList.remove("active");
       toast("Highlight saved");
     });
 
@@ -801,14 +1073,22 @@ async function postPage(id) {
     });
 
     $("#btn-copy")?.addEventListener("click", () => {
-      const textToCopy = currentRange ? currentRange.toString() : document.getElementById(toolbar.dataset.markId)?.textContent;
-      if (textToCopy) navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
+      const textToCopy = currentRange
+        ? currentRange.toString()
+        : document.getElementById(toolbar.dataset.markId)?.textContent;
+      if (textToCopy)
+        navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
       toast("Quote copied");
       toolbar.classList.remove("active");
     });
 
     function applyHighlight(text) {
-      const walker = document.createTreeWalker(articleContent, NodeFilter.SHOW_TEXT, null, false);
+      const walker = document.createTreeWalker(
+        articleContent,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false,
+      );
       let node;
       while ((node = walker.nextNode())) {
         const idx = node.nodeValue.indexOf(text);
@@ -828,28 +1108,36 @@ async function postPage(id) {
     $$(".toc a").forEach((a) =>
       a.addEventListener("click", (e) => {
         e.preventDefault();
-        document.getElementById(a.dataset.toc)?.scrollIntoView({ behavior: "smooth", block: "start" });
-      })
+        document
+          .getElementById(a.dataset.toc)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }),
     );
-
     try {
       const list = await api("/api/posts?page=1");
       const others = list.items.filter((x) => x.id !== p.id).slice(0, 4);
       $("#related").innerHTML = others.length
-        ? others.map((r) => `<a class="related-item" href="#/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`).join("")
+        ? others
+            .map(
+              (r) =>
+                `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
+            )
+            .join("")
         : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
     } catch {}
-
   } catch (e) {
-    shell(`<section class="wrap page-head">${empty(e.message, "Back home", "#/")}</section>`);
+    shell(
+      `<section class="wrap page-head">${empty(e.message, "Back home", "/")}</section>`,
+    );
   }
 }
 
-// ==================== AUTH & OTHERS ====================
+// ==================== AUTH & PROFILE ====================
 function authPage(mode) {
   const login = mode === "login";
+  updateMeta(`${login ? "Log In" : "Sign Up"} — InkWell`, "Join InkWell.");
   shell(`<section class="auth-layout">
-    <aside><a class="brand" href="#/">Ink<span>Well</span></a><blockquote>"Words are, of course, the most powerful drug used by mankind."<small>— Rudyard Kipling</small></blockquote></aside>
+    <aside><a class="brand" href="/">Ink<span>Well</span></a><blockquote>"Words are, of course, the most powerful drug used by mankind."<small>— Rudyard Kipling</small></blockquote></aside>
     <section class="auth-form"><div>
       <div class="eyebrow">${login ? "Welcome back" : "Join the conversation"}</div>
       <h1>${login ? "Sign in to InkWell" : "Create your writer account"}</h1>
@@ -859,8 +1147,8 @@ function authPage(mode) {
         <label>Password<input type="password" name="password" autocomplete="${login ? "current-password" : "new-password"}" placeholder="••••••••" required></label>
         <button class="button" type="submit">${login ? "Sign in →" : "Create account →"}</button>
       </form>
-      ${login ? '<p class="form-foot" style="margin-top:10px"><a href="#/forgot-password">Forgot password?</a></p>' : ""}
-      <p class="form-foot">${login ? 'New here? <a href="#/register">Create an account</a>' : 'Already a member? <a href="#/login">Sign in</a>'}</p>
+      ${login ? '<p class="form-foot" style="margin-top:10px"><a href="/forgot-password">Forgot password?</a></p>' : ""}
+      <p class="form-foot">${login ? 'New here? <a href="/register">Create an account</a>' : 'Already a member? <a href="/login">Sign in</a>'}</p>
     </div></section>
   </section>`);
   $("#auth").addEventListener("submit", async (e) => {
@@ -876,7 +1164,7 @@ function authPage(mode) {
         }),
       );
       toast("Success");
-      location.hash = "#/editor";
+      navigate("/editor");
     } catch (err) {
       toast(err.message, "error");
       b.disabled = false;
@@ -886,8 +1174,9 @@ function authPage(mode) {
 }
 
 function forgotPasswordPage() {
+  updateMeta("Forgot Password — InkWell", "Reset your password.");
   shell(`<section class="auth-layout">
-    <aside><a class="brand" href="#/">Ink<span>Well</span></a><blockquote>"Not all those who wander are lost."<small>— J.R.R. Tolkien</small></blockquote></aside>
+    <aside><a class="brand" href="/">Ink<span>Well</span></a><blockquote>"Not all those who wander are lost."<small>— J.R.R. Tolkien</small></blockquote></aside>
     <section class="auth-form"><div>
       <div class="eyebrow">Account recovery</div><h1>Reset your password</h1><p id="forgot-subtitle">Enter your email to receive a 6-digit code.</p>
       <div id="spam-note" style="display:none;margin:0 0 16px 0;padding:10px 14px;background:#fff8e1;border-left:3px solid #d4a72c;border-radius:6px;font-size:13px;line-height:1.5;color:#6b655b;">Can't find the email? Check your <b>spam</b> folder.</div>
@@ -900,7 +1189,7 @@ function forgotPasswordPage() {
         </div>
         <button class="button" type="submit" id="forgot-submit">Send code →</button>
       </form>
-      <p class="form-foot">Remembered it? <a href="#/login">Back to sign in</a></p>
+      <p class="form-foot">Remembered it? <a href="/login">Back to sign in</a></p>
     </div></section>
   </section>`);
   let step = 1;
@@ -950,7 +1239,7 @@ function forgotPasswordPage() {
           }),
         });
         toast("Password reset.");
-        location.hash = "#/login";
+        navigate("/login");
       } catch (err) {
         toast(err.message, "error");
         btn.disabled = false;
@@ -962,16 +1251,90 @@ function forgotPasswordPage() {
 
 async function apply() {
   if (!state.user) {
-    location.hash = "#/register";
+    navigate("/register");
     return;
   }
-  location.hash = "#/editor";
+  navigate("/editor");
 }
 
+function profile() {
+  if (!guard()) return;
+  updateMeta("Your Profile — InkWell", "Update your profile.");
+  const u = state.user;
+  const cur = u.profilePictureUrl || "";
+  const dn = u.displayName || u.username || "";
+  shell(
+    `<section class="wrap profile-page"><div class="page-head" style="padding-bottom:20px"><div class="eyebrow">Identity</div><h1>Profile</h1></div><form id="profile" class="profile-form"><div class="profile-grid"><aside class="profile-avatar-col"><div class="profile-avatar" id="avatar-preview">${cur ? `<img src="${esc(cur)}" alt="">` : `<span>${(dn[0] || "U").toUpperCase()}</span>`}</div><input type="file" accept="image/*" id="profile-file" style="display:none"><input type="hidden" name="image" value="${esc(cur)}"><div class="avatar-actions"><button type="button" class="button small secondary" id="pick-image">Upload</button>${cur ? `<button type="button" class="button small danger" id="remove-image">Remove</button>` : ""}</div></aside><div class="profile-fields"><label>Display name<input name="displayName" value="${esc(dn)}"></label><label>Profession<input name="profession" value="${esc(u.profession || "")}"></label><label>Location<input name="location" value="${esc(u.location || "")}"></label><label>Website<input name="website" value="${esc(u.website || "")}"></label><label>Twitter / X<input name="twitterHandle" value="${esc(u.twitterHandle || "")}"></label><label>LinkedIn<input name="linkedinUrl" value="${esc(u.linkedInUrl || "")}"></label><label>Bio<textarea name="bio">${esc(u.bio || "")}</textarea></label><div class="form-actions"><button class="button" type="submit">Save</button><a class="button secondary" href="/author/${u.id}">View public</a></div></div></div></form></section>`,
+  );
+  const fileInput = $("#profile-file");
+  $("#pick-image")?.addEventListener("click", () => fileInput.click());
+  $("#remove-image")?.addEventListener("click", () => {
+    $("[name=image]").value = "";
+    $("#avatar-preview").innerHTML =
+      `<span>${(dn[0] || "U").toUpperCase()}</span>`;
+  });
+  fileInput?.addEventListener("change", async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      toast("Uploading…");
+      const url = await uploadImage(file);
+      $("[name=image]").value = url;
+      $("#avatar-preview").innerHTML = `<img src="${esc(url)}" alt="">`;
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  });
+  $("#profile").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    try {
+      const d = await api("/api/auth/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          displayName: f.get("displayName"),
+          bio: f.get("bio"),
+          profilePictureUrl: f.get("image"),
+          profession: f.get("profession"),
+          location: f.get("location"),
+          website: f.get("website"),
+          twitterHandle: f.get("twitterHandle"),
+          linkedinUrl: f.get("linkedinUrl"),
+        }),
+      });
+      state.user = d.user;
+      localStorage.setItem("inkwell_user", JSON.stringify(d.user));
+      toast("Updated");
+      render();
+    } catch (x) {
+      toast(x.message, "error");
+    }
+  });
+}
+
+async function author(id) {
+  updateMeta("Author Profile — InkWell", "Read articles by this author.");
+  shell(
+    `<section class="wrap page-head" id="author"></section><section class="wrap post-grid" id="posts"></section>`,
+  );
+  const d = await api(`/api/authors/${id}`);
+  const u = d.author;
+  const name = u.displayName || u.username;
+  const meta = [u.profession, u.studies, u.location]
+    .filter(Boolean)
+    .join(" · ");
+  $("#author").innerHTML =
+    `<span class="mini-avatar large">${avatarImg(u)}</span><div class="eyebrow">Contributor</div><h1>${esc(name)}</h1>${meta ? `<p class="author-meta">${esc(meta)}</p>` : ""}<p>${esc(u.bio || "Writer.")}</p>`;
+  $("#posts").innerHTML =
+    d.posts.map(card).join("") || empty("No articles.", "Home", "/");
+}
+
+// ==================== EDITOR & ADMIN ====================
 async function editor() {
   if (!guard(["Editor", "Admin"])) return;
+  updateMeta("Dashboard — InkWell", "Your writing desk.");
   shell(
-    `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Your writing desk</div><h1>Hello, ${esc(state.user.displayName || state.user.username)}.</h1></div><a class="button" href="#/editor/new">New article +</a></div><div class="stats" id="editor-stats"></div><div class="table-wrap"><div class="section-heading"><h2>Your stories</h2></div><div id="my-posts"></div></div></section>`,
+    `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Your writing desk</div><h1>Hello, ${esc(state.user.displayName || state.user.username)}.</h1></div><a class="button" href="/editor/new">New article +</a></div><div class="stats" id="editor-stats"></div><div class="table-wrap"><div class="section-heading"><h2>Your stories</h2></div><div id="my-posts"></div></div></section>`,
   );
   const posts = await api("/api/posts/mine");
   const counts = ["Draft", "PendingReview", "Published", "Rejected"].map(
@@ -984,8 +1347,8 @@ async function editor() {
     )
     .join("");
   $("#my-posts").innerHTML = posts.length
-    ? `<table><thead><tr><th>Story</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${posts.map((p) => `<tr><td><b>${esc(p.title)}</b>${p.rejectionReason ? `<small class="reject">Returned: ${esc(p.rejectionReason)}</small>` : ""}</td><td><span class="status ${p.status.toLowerCase()}">● ${p.status.replace("Review", " review")}</span></td><td>${date(p.updatedAt)}</td><td><a href="#/editor/edit/${p.id}">Edit →</a> <button class="link-button delete-own-post" data-id="${p.id}" style="color:var(--danger);margin-left:8px">Delete</button></td></tr>`).join("")}</tbody></table>`
-    : empty("Start a first draft.", "Write article", "#/editor/new");
+    ? `<table><thead><tr><th>Story</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${posts.map((p) => `<tr><td><b>${esc(p.title)}</b>${p.rejectionReason ? `<small class="reject">Returned: ${esc(p.rejectionReason)}</small>` : ""}</td><td><span class="status ${p.status.toLowerCase()}">● ${p.status.replace("Review", " review")}</span></td><td>${date(p.updatedAt)}</td><td><a href="/editor/edit/${p.id}">Edit →</a> <button class="link-button delete-own-post" data-id="${p.id}" style="color:var(--danger);margin-left:8px">Delete</button></td></tr>`).join("")}</tbody></table>`
+    : empty("Start a first draft.", "Write article", "/editor/new");
   $$(".delete-own-post").forEach(
     (b) =>
       (b.onclick = async () => {
@@ -1003,6 +1366,7 @@ async function editor() {
 
 async function composer(id) {
   if (!guard(["Editor", "Admin"])) return;
+  updateMeta("Write an Article — InkWell", "Compose your next story.");
   let post = id
     ? await api(`/api/posts/mine/${id}`)
     : {
@@ -1014,9 +1378,48 @@ async function composer(id) {
         images: [],
       };
   const curImg = post.mainImageUrl || "";
-  shell(
-    `<section class="editor-page wrap"><div class="editor-top"><a href="#/editor">← Dashboard</a><div><button class="button secondary" id="save">Save draft</button><button class="button" id="submit">${state.user.role === "Admin" ? "Publish" : "Submit for review"} →</button></div></div><div class="editor-grid"><section><input class="title-input" name="title" value="${esc(post.title)}" placeholder="An unforgettable title"><div class="composer-toolbar"><button type="button" data-md="bold"><b>B</b></button><button type="button" data-md="italic"><i>I</i></button><button type="button" data-md="link">🔗</button><button type="button" data-md="quote">"</button><button type="button" data-md="image">📷 Image</button></div><input type="file" accept="image/*" id="inline-file" style="display:none"><textarea class="writing-area" name="content" placeholder="Start writing…\n\nMarkdown is welcome.">${esc(post.content)}</textarea></section><aside class="meta"><h2>Story details</h2><label>Cover image <span style="color:var(--danger)">*</span><input type="file" accept="image/*" id="cover-file"><input type="hidden" name="image" value="${esc(curImg)}"></label><div class="image-preview" id="cover-preview">${curImg ? `<img src="${esc(curImg)}" alt="">` : "<span>No cover</span>"}</div><label>Categories <input name="categories" value="${esc(post.categories.join(", "))}" placeholder="Culture, Design"></label><label>Tags <input name="tags" value="${esc(post.tags.join(", "))}" placeholder="writing, ideas"></label></aside></div></section>`,
-  );
+
+  shell(`
+    <section class="editor-page wrap">
+      <div class="editor-top">
+        <a href="/editor">← Dashboard</a>
+        <div>
+          <button class="button secondary" id="toggle-preview">Preview</button>
+          <button class="button secondary" id="save">Save draft</button>
+          <button class="button" id="submit">${state.user.role === "Admin" ? "Publish" : "Submit for review"} →</button>
+        </div>
+      </div>
+      <div class="editor-grid">
+        <section>
+          <input class="title-input" name="title" value="${esc(post.title)}" placeholder="An unforgettable title">
+          <div class="composer-toolbar">
+            <button type="button" data-md="bold"><b>B</b></button>
+            <button type="button" data-md="italic"><i>I</i></button>
+            <button type="button" data-md="link">🔗</button>
+            <button type="button" data-md="quote">"</button>
+            <button type="button" data-md="image">📷 Image</button>
+          </div>
+          <input type="file" accept="image/*" id="inline-file" style="display:none">
+          
+          <textarea class="writing-area" name="content" placeholder="Start writing…\n\nMarkdown is welcome.">${esc(post.content)}</textarea>
+          
+          <!-- LIVE PREVIEW DIV -->
+          <div id="editor-preview" style="display:none; border: 1px solid var(--line); padding: 32px; background: var(--surface); min-height: 620px; overflow-y:auto; border-radius: 12px; max-width: 100%;">
+            <div class="article-content" id="preview-content" style="padding-bottom: 0; max-width: 800px; margin: 0 auto;"></div>
+          </div>
+        </section>
+        
+        <aside class="meta">
+          <h2>Story details</h2>
+          <label>Cover image <span style="color:var(--danger)">*</span><input type="file" accept="image/*" id="cover-file"><input type="hidden" name="image" value="${esc(curImg)}"></label>
+          <div class="image-preview" id="cover-preview">${curImg ? `<img src="${esc(curImg)}" alt="">` : "<span>No cover</span>"}</div>
+          <label>Categories <input name="categories" value="${esc(post.categories.join(", "))}" placeholder="Culture, Design"></label>
+          <label>Tags <input name="tags" value="${esc(post.tags.join(", "))}" placeholder="writing, ideas"></label>
+        </aside>
+      </div>
+    </section>
+  `);
+
   const fields = {
     title: $("[name=title]"),
     content: $("[name=content]"),
@@ -1025,6 +1428,30 @@ async function composer(id) {
     tags: $("[name=tags]"),
   };
   const inlineFile = $("#inline-file");
+    const previewDiv = $("#editor-preview");
+  const previewContent = $("#preview-content");
+  const textarea = $("[name=content]");
+  let previewMode = false;
+
+  $("#toggle-preview")?.addEventListener("click", () => {
+    previewMode = !previewMode;
+    if (previewMode) {
+      textarea.style.display = "none";
+      previewDiv.style.display = "block";
+      // Render the markdown into the article-content container
+      previewContent.innerHTML = markdown(textarea.value) || "<p style='color:var(--muted)'>Nothing to preview yet…</p>";
+      $("#toggle-preview").textContent = "Edit";
+    } else {
+      textarea.style.display = "block";
+      previewDiv.style.display = "none";
+      $("#toggle-preview").textContent = "Preview";
+    }
+  });
+
+  textarea.addEventListener("input", () => { 
+    if (previewMode) previewContent.innerHTML = markdown(textarea.value); 
+  });
+
   function wrapSelection(before, after = before) {
     const ta = fields.content;
     const start = ta.selectionStart;
@@ -1038,6 +1465,7 @@ async function composer(id) {
       ta.value.slice(end);
     ta.focus();
   }
+
   $("#cover-file")?.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1050,6 +1478,7 @@ async function composer(id) {
       toast(err.message, "error");
     }
   });
+
   $$("[data-md]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const a = btn.dataset.md;
@@ -1062,6 +1491,7 @@ async function composer(id) {
       } else if (a === "image") inlineFile.click();
     });
   });
+
   inlineFile?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1074,6 +1504,7 @@ async function composer(id) {
       toast(err.message, "error");
     }
   });
+
   const save = async (draft) => {
     if (!draft && !fields.image.value) {
       toast("Cover required", "error");
@@ -1099,9 +1530,10 @@ async function composer(id) {
         saveAsDraft: draft,
       }),
     });
-    if (!draft) location.hash = "#/editor";
+    if (!draft) navigate("/editor");
     else toast("Saved");
   };
+
   $("#save").addEventListener("click", () =>
     save(true).catch((e) => toast(e.message, "error")),
   );
@@ -1112,6 +1544,7 @@ async function composer(id) {
 
 async function admin() {
   if (!guard(["Admin"])) return;
+  updateMeta("Admin Panel — InkWell", "Editorial control room.");
   shell(
     `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Editorial control room</div><h1>Good morning, editor.</h1></div></div><div class="stats" id="admin-stats"></div><div class="admin-tabs"><button class="active" data-tab="posts">Pending posts</button><button data-tab="applications">Editor applications</button><button data-tab="users">Community</button></div><div id="admin-content" class="table-wrap"></div></section>`,
   );
@@ -1139,7 +1572,7 @@ async function admin() {
                 `<article class="review"><div><div class="eyebrow">${esc(p.author.username)} · ${date(p.createdAt)}</div><h2>${esc(p.title)}</h2><p>${esc(p.excerpt)}</p><button class="link-button danger-link delete-post" data-id="${p.id}" style="color:var(--danger)">Delete</button></div><div class="review-actions"><button class="button approve" data-id="${p.id}">Approve</button><button class="button danger reject-post" data-id="${p.id}">Return</button></div></article>`,
             )
             .join("")
-        : empty("Nothing waiting.", "Home", "#/");
+        : empty("Nothing waiting.", "Home", "/");
     else if (t === "applications")
       out.innerHTML = applications.filter((a) => a.status === "Pending").length
         ? applications
@@ -1149,7 +1582,7 @@ async function admin() {
                 `<article class="review"><div><h2>${esc(a.applicant.username)}</h2><p>${esc(a.motivation)}</p></div><div class="review-actions"><button class="button approve-app" data-id="${a.id}">Approve</button><button class="button danger reject-app" data-id="${a.id}">Decline</button></div></article>`,
             )
             .join("")
-        : empty("No applications.", "Home", "#/");
+        : empty("No applications.", "Home", "/");
     else
       out.innerHTML = `<table><thead><tr><th>Member</th><th>Role</th></tr></thead><tbody>${users.map((u) => `<tr><td><b>${esc(u.username)}</b></td><td><span class="status">${esc(u.role)}</span></td></tr>`).join("")}</tbody></table>`;
     bindAdmin();
@@ -1213,92 +1646,17 @@ async function admin() {
   }
 }
 
-function profile() {
-  if (!guard()) return;
-  const u = state.user;
-  const cur = u.profilePictureUrl || "";
-  const dn = u.displayName || u.username || "";
-  shell(
-    `<section class="wrap profile-page"><div class="page-head" style="padding-bottom:20px"><div class="eyebrow">Identity</div><h1>Profile</h1></div><form id="profile" class="profile-form"><div class="profile-grid"><aside class="profile-avatar-col"><div class="profile-avatar" id="avatar-preview">${cur ? `<img src="${esc(cur)}" alt="">` : `<span>${(dn[0] || "U").toUpperCase()}</span>`}</div><input type="file" accept="image/*" id="profile-file" style="display:none"><input type="hidden" name="image" value="${esc(cur)}"><div class="avatar-actions"><button type="button" class="button small secondary" id="pick-image">Upload</button>${cur ? `<button type="button" class="button small danger" id="remove-image">Remove</button>` : ""}</div></aside><div class="profile-fields"><label>Display name<input name="displayName" value="${esc(dn)}"></label><label>Profession<input name="profession" value="${esc(u.profession || "")}"></label><label>Location<input name="location" value="${esc(u.location || "")}"></label><label>Website<input name="website" value="${esc(u.website || "")}"></label><label>Twitter / X<input name="twitterHandle" value="${esc(u.twitterHandle || "")}"></label><label>LinkedIn<input name="linkedinUrl" value="${esc(u.linkedInUrl || "")}"></label><label>Bio<textarea name="bio">${esc(u.bio || "")}</textarea></label><div class="form-actions"><button class="button" type="submit">Save</button><a class="button secondary" href="#/author/${u.id}">View public</a></div></div></div></form></section>`,
-  );
-  const fileInput = $("#profile-file");
-  $("#pick-image")?.addEventListener("click", () => fileInput.click());
-  $("#remove-image")?.addEventListener("click", () => {
-    $("[name=image]").value = "";
-    $("#avatar-preview").innerHTML =
-      `<span>${(dn[0] || "U").toUpperCase()}</span>`;
-  });
-  fileInput?.addEventListener("change", async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      toast("Uploading…");
-      const url = await uploadImage(file);
-      $("[name=image]").value = url;
-      $("#avatar-preview").innerHTML = `<img src="${esc(url)}" alt="">`;
-    } catch (err) {
-      toast(err.message, "error");
-    }
-  });
-  $("#profile").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target);
-    try {
-      const d = await api("/api/auth/profile", {
-        method: "PUT",
-        body: JSON.stringify({
-          displayName: f.get("displayName"),
-          bio: f.get("bio"),
-          profilePictureUrl: f.get("image"),
-          profession: f.get("profession"),
-          location: f.get("location"),
-          website: f.get("website"),
-          twitterHandle: f.get("twitterHandle"),
-          linkedinUrl: f.get("linkedinUrl"),
-        }),
-      });
-      state.user = d.user;
-      localStorage.setItem("inkwell_user", JSON.stringify(d.user));
-      toast("Updated");
-      render();
-    } catch (x) {
-      toast(x.message, "error");
-    }
-  });
-}
-
-async function author(id) {
-  shell(
-    `<section class="wrap page-head" id="author"></section><section class="wrap post-grid" id="posts"></section>`,
-  );
-  const d = await api(`/api/authors/${id}`);
-  const u = d.author;
-  const name = u.displayName || u.username;
-  const meta = [u.profession, u.studies, u.location]
-    .filter(Boolean)
-    .join(" · ");
-  $("#author").innerHTML =
-    `<span class="mini-avatar large">${avatarImg(u)}</span><div class="eyebrow">Contributor</div><h1>${esc(name)}</h1>${meta ? `<p class="author-meta">${esc(meta)}</p>` : ""}<p>${esc(u.bio || "Writer.")}</p>`;
-  $("#posts").innerHTML =
-    d.posts.map(card).join("") || empty("No articles.", "Home", "#/");
-}
-
-function about() {
-  shell(
-    `<section class="wrap page-head about"><div class="eyebrow">Idea</div><h1>A better room for the written word.</h1><p>InkWell is a digital magazine for readers with curiosity and writers with something worth saying.</p><a class="button" href="#/apply">Write for InkWell →</a></section>`,
-  );
-}
-
+// ==================== HELPERS & MODALS ====================
 function empty(text, label, href) {
   return `<div class="empty"><span>✦</span><h2>${esc(text)}</h2><a class="button secondary" href="${href}">${esc(label)}</a></div>`;
 }
 function guard(roles) {
   if (!state.user) {
-    location.hash = "#/login";
+    navigate("/login");
     return false;
   }
   if (roles && !roles.includes(state.user.role)) {
-    location.hash = "#/";
+    navigate("/");
     return false;
   }
   return true;
@@ -1327,7 +1685,7 @@ function searchModal() {
         ? d.items
             .map(
               (p) =>
-                `<a href="#/post/${p.id}" class="search-item">${esc(p.title)}<small>${esc(p.author.username)}</small></a>`,
+                `<a href="/post/${p.id}" class="search-item">${esc(p.title)}<small>${esc(p.author.username)}</small></a>`,
             )
             .join("")
         : "No results.";
@@ -1335,15 +1693,18 @@ function searchModal() {
   };
 }
 
-// ==================== ROUTER ====================
+// ==================== ROUTER INITIALIZATION ====================
 async function render() {
-  const route = location.hash.slice(1) || "/";
+  const route = location.pathname;
   window.scrollTo({ top: 0, behavior: "instant" });
   try {
     if (route === "/") await home();
     else if (route === "/login") authPage("login");
     else if (route === "/register") authPage("register");
     else if (route === "/forgot-password") forgotPasswordPage();
+    else if (route === "/about") aboutPage();
+    else if (route === "/privacy") privacyPage();
+    else if (route === "/contact") contactPage();
     else if (route === "/apply") await apply();
     else if (route === "/editor") await editor();
     else if (route === "/editor/new") await composer();
@@ -1351,7 +1712,6 @@ async function render() {
       await composer(route.split("/").pop());
     else if (route === "/admin") await admin();
     else if (route === "/profile") profile();
-    else if (route === "/about") about();
     else if (route === "/library") libraryPage();
     else if (route === "/categories") await categoriesPage();
     else if (route.startsWith("/post/")) await postPage(route.split("/").pop());
@@ -1363,12 +1723,11 @@ async function render() {
     else await home();
   } catch (e) {
     shell(
-      `<section class="wrap page-head">${empty(e.message, "Back home", "#/")}</section>`,
+      `<section class="wrap page-head">${empty(e.message, "Back home", "/")}</section>`,
     );
   }
 }
 
-addEventListener("hashchange", render);
 addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
