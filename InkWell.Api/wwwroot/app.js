@@ -218,6 +218,10 @@ function markdown(text) {
       (_, alt, url) =>
         `<figure class="article-image"><img src="${url}" alt="${alt}" loading="lazy" />${alt ? `<figcaption>${alt}</figcaption>` : ""}</figure>`,
     )
+    .replace(
+      /\[([^\]]+)\]\(((?:https?:\/\/|\/)[^)\s]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    )
     .replace(/^### (.*)$/gm, (_, t) => `<h3 id="${slugify(t)}">${t}</h3>`)
     .replace(/^## (.*)$/gm, (_, t) => `<h2 id="${slugify(t)}">${t}</h2>`)
     .replace(/^# (.*)$/gm, (_, t) => `<h1 id="${slugify(t)}">${t}</h1>`)
@@ -356,7 +360,7 @@ function shell(content) {
         <a class="brand" href="/" aria-label="InkWell home"><span class="nib">✦</span>Ink<span>Well</span></a>
         <button class="mobile-menu" aria-label="Open menu">☰</button>
         <div class="nav-links">
-          <a href="/">Home</a><a href="/categories">Categories</a><a href="/library">Saved</a><a href="/about">About</a>
+          <a href="/">Home</a><a href="/articles">Articles</a><a href="/categories">Categories</a><a href="/library">Saved</a><a href="/about">About</a>
         </div>
         <div class="nav-actions">
           <button class="icon" id="random-post" title="Surprise me">🎲</button>
@@ -544,6 +548,7 @@ async function home() {
         <button class="link-button" id="open-search">Search articles ↗</button>
       </div>
       <div class="post-grid" id="posts"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      <div id="home-more" style="text-align:center; margin: 40px 0;"></div>
     </section>
     <section class="cta wrap">
       <div><div class="eyebrow">Your perspective matters</div><h2>Have something to say?</h2><p>Write your next article and share it with a community of curious readers.</p></div>
@@ -557,12 +562,14 @@ async function home() {
       api("/api/posts"),
     ]);
     state.categories = cats;
-    const displayPosts = data.items.slice(0, 6);
     $("#category-bar").innerHTML =
-      `<a class="chip active" href="/">All articles</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
+      `<a class="chip active" href="/articles">All (${data.total})</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
     $("#posts").innerHTML = data.items.length
       ? data.items.map(card).join("")
       : empty("No articles match that search.", "Clear filters", "/");
+    if (data.total > 6 || data.total > data.items.length) {
+      $("#home-more").innerHTML = `<a class="button secondary" href="/articles">Browse all articles (${data.total}) <span>→</span></a>`;
+    }
   } catch (e) {
     $("#posts").innerHTML = empty(
       "The library is waking up.",
@@ -571,6 +578,66 @@ async function home() {
     );
   }
   $("#open-search")?.addEventListener("click", searchModal);
+}
+
+// ==================== ALL ARTICLES ====================
+async function articlesPage(page = 1) {
+  updateMeta(
+    "All Articles — InkWell",
+    "Explore every published story, essay, and thought on InkWell.",
+  );
+
+  shell(`
+    <section class="page-head wrap">
+      <div class="eyebrow">Library</div>
+      <h1>All Articles</h1>
+      <p>Explore every published story, essay, and thought on InkWell.</p>
+    </section>
+    <section class="wrap category-bar" id="category-bar"></section>
+    <section class="wrap">
+      <div class="post-grid" id="posts"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
+      <div class="pagination-row" id="pagination"></div>
+    </section>
+  `);
+
+  try {
+    const [cats, data] = await Promise.all([
+      api("/api/categories"),
+      api(`/api/posts?page=${page}`),
+    ]);
+    state.categories = cats;
+    $("#category-bar").innerHTML = `<a class="chip active" href="/articles">All (${data.total})</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
+
+    $("#posts").innerHTML = data.items.length
+      ? data.items.map(card).join("")
+      : empty("No articles published yet.", "Start writing", "/editor/new");
+
+    const totalPages = Math.ceil(data.total / (data.pageSize || 9));
+    if (totalPages > 1) {
+      let pagHtml = "";
+      if (page > 1) {
+        pagHtml += `<button class="button small secondary" id="prev-page">← Previous</button>`;
+      }
+      pagHtml += `<span style="font-size:14px;color:var(--muted);font-weight:600">Page ${page} of ${totalPages}</span>`;
+      if (page < totalPages) {
+        pagHtml += `<button class="button small secondary" id="next-page">Next →</button>`;
+      }
+      $("#pagination").innerHTML = pagHtml;
+
+      $("#prev-page")?.addEventListener("click", () => {
+        window.history.pushState(null, "", `/articles?page=${page - 1}`);
+        articlesPage(page - 1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+      $("#next-page")?.addEventListener("click", () => {
+        window.history.pushState(null, "", `/articles?page=${page + 1}`);
+        articlesPage(page + 1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+  } catch (e) {
+    $("#posts").innerHTML = empty("Could not load articles.", "Try again", "/articles");
+  }
 }
 
 // ==================== STATIC PAGES ====================
@@ -1758,6 +1825,11 @@ async function render() {
   window.scrollTo({ top: 0, behavior: "instant" });
   try {
     if (route === "/") await home();
+    else if (route === "/articles" || route.startsWith("/articles")) {
+      const urlParams = new URLSearchParams(location.search);
+      const page = parseInt(urlParams.get("page") || "1", 10);
+      await articlesPage(page);
+    }
     else if (route === "/login") authPage("login");
     else if (route === "/register") authPage("register");
     else if (route === "/forgot-password") forgotPasswordPage();

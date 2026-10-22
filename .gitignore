@@ -48,5 +48,7 @@ publish/
 article.json
 post_article.py
 export_for_ai.ps1
+__pycache__/
+*.pyc
 # Cursor IDE
 .cursor/
