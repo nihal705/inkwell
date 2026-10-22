@@ -343,7 +343,7 @@ function shell(content) {
     <footer>
       <div class="wrap footer-grid">
         <div><a class="brand" href="/">Ink<span>Well</span></a><p>Where readers become writers.</p></div>
-        <div><b>Explore</b><a href="/">Latest stories</a><a href="/categories">Categories</a><a href="/library">Saved</a></div>
+        <div><b>Explore</b><a href="/">Latest articles</a><a href="/categories">Categories</a><a href="/library">Saved</a></div>
         <div><b>Write</b>${u ? `<a href="/editor/new">New article</a><a href="/editor">Dashboard</a>` : `<a href="/register">Start writing</a>`}</div>
         <div><b>Legal</b><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/contact">Contact</a></div>
       </div>
@@ -488,7 +488,7 @@ async function home() {
     <section class="wrap" id="articles">
       <div class="section-heading">
         <div><div class="eyebrow">Fresh from the inkwell</div><h2>Latest articles</h2></div>
-        <button class="link-button" id="open-search">Search stories ↗</button>
+        <button class="link-button" id="open-search">Search articles ↗</button>
       </div>
       <div class="post-grid" id="posts"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>
     </section>
@@ -506,7 +506,7 @@ async function home() {
     state.categories = cats;
     const displayPosts = data.items.slice(0, 6);
     $("#category-bar").innerHTML =
-      `<a class="chip active" href="/">All stories</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
+      `<a class="chip active" href="/">All articles</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
     $("#posts").innerHTML = data.items.length
       ? data.items.map(card).join("")
       : empty("No articles match that search.", "Clear filters", "/");
@@ -585,7 +585,7 @@ async function categoriesPage() {
       ? cats
           .map(
             (c) =>
-              `<a class="category-card" href="/category/${encodeURIComponent(c.name)}"><b>${esc(c.name)}</b><span>${c.postCount || 0} stories</span></a>`,
+              `<a class="category-card" href="/category/${encodeURIComponent(c.name)}"><b>${esc(c.name)}</b><span>${c.postCount || 0} articles</span></a>`,
           )
           .join("")
       : empty("No categories yet.", "Back home", "/");
@@ -599,7 +599,7 @@ async function categoriesPage() {
 }
 
 async function category(name) {
-  updateMeta(`${name} — InkWell`, `Stories in ${name}.`);
+  updateMeta(`${name} — InkWell`, `articles in ${name}.`);
   shell(
     `<section class="page-head wrap"><div class="eyebrow">InkWell category</div><h1>${esc(name)}</h1><p>Stories gathered around one good question.</p></section><section class="wrap post-grid" id="posts"></section>`,
   );
@@ -608,32 +608,32 @@ async function category(name) {
     ? d.items.map(card).join("")
     : empty(
         "No published articles in this category yet.",
-        "Explore all stories",
+        "Explore all articles",
         "/",
       );
 }
 
 async function tagPage(name) {
-  updateMeta(`#${name} — InkWell`, `Stories tagged with #${name}.`);
+  updateMeta(`#${name} — InkWell`, `article tagged with #${name}.`);
   shell(
-    `<section class="page-head wrap"><div class="eyebrow">Keyword</div><h1>#${esc(name)}</h1><p>All stories tagged with ${esc(name)}.</p></section><section class="wrap post-grid" id="posts"><div class="skeleton"></div></section>`,
+    `<section class="page-head wrap"><div class="eyebrow">Keyword</div><h1>#${esc(name)}</h1><p>All articles tagged with ${esc(name)}.</p></section><section class="wrap post-grid" id="posts"><div class="skeleton"></div></section>`,
   );
   const d = await api(`/api/posts?tag=${encodeURIComponent(name)}`);
   $("#posts").innerHTML = d.items.length
     ? d.items.map(card).join("")
     : empty(
         "No published articles with this tag yet.",
-        "Explore all stories",
+        "Explore all articles",
         "/",
       );
 }
 
 // ==================== LIBRARY ====================
 function libraryPage() {
-  updateMeta("Saved Stories — InkWell", "Your personal reading list.");
+  updateMeta("Saved articles — InkWell", "Your personal reading list.");
   const saved = store.get("library", []);
   shell(`
-    <section class="page-head wrap"><div class="eyebrow">Your reading list</div><h1>Saved Stories</h1><p>Stories you've saved to read later. Stored locally on this device.</p></section>
+    <section class="page-head wrap"><div class="eyebrow">Your reading list</div><h1>Saved Stories</h1><p>Articles you've saved to read later. Stored locally on this device.</p></section>
     <section class="wrap post-grid" id="lib-posts">
       ${
         saved.length
@@ -656,7 +656,7 @@ function libraryPage() {
       `,
               )
               .join("")
-          : empty("Your reading list is empty.", "Explore stories", "/")
+          : empty("Your reading list is empty.", "Explore articles", "/")
       }
     </section>
   `);
@@ -680,9 +680,7 @@ async function postPage(id) {
       p.mainImageUrl,
     );
 
-    const isSaved = store
-      .get("library", [])
-      .some((x) => String(x.id) === String(p.id));
+    const isSaved = store.get("library", []).some((x) => String(x.id) === String(p.id));
     const toc = [];
     p.content.replace(/^(##|###) (.+)$/gm, (m, hashes, text) =>
       toc.push({ level: hashes.length, text, slug: slugify(text) }),
@@ -692,63 +690,84 @@ async function postPage(id) {
     const shareText = encodeURIComponent(p.title + " — InkWell");
     const encUrl = encodeURIComponent(shareUrl);
 
-    // --- Generate Two Different Ads for Desktop ---
+    // --- Generate Two Different Ads ---
     const adKeys = ["mycodendotes", "kwikcric"];
     const leftAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
     let rightAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
-    // Force them to be different if there are multiple ads
     if (adKeys.length > 1) {
       while (leftAdKey === rightAdKey) {
         rightAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
       }
     }
 
+    // --- Reusable HTML Blocks ---
+    const toolsHtml = `
+      <div class="side-block tools-block">
+        <b>Tools</b>
+        <button class="focus-btn summary-btn">Read Summary</button>
+        <button class="focus-btn focus-toggle">Focus Mode</button>
+        <button class="focus-btn tts-toggle">🎧 Listen to Article</button>
+        <button class="focus-btn save-article-btn ${isSaved ? "saved" : ""}" data-id="${p.id}" data-title="${esc(p.title)}" data-img="${esc(p.mainImageUrl || "")}">${isSaved ? "Saved" : "Save for Later"}</button>
+      </div>
+    `;
+
+    const shareHtml = `
+      <div class="side-block share-block">
+        <b>Share</b>
+        <div class="share-mini">
+          <a href="https://wa.me/?text=${shareText}%20${encUrl}" target="_blank" rel="noopener" title="WhatsApp">W</a>
+          <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${encUrl}" target="_blank" rel="noopener" title="X">X</a>
+          <a href="https://www.facebook.com/sharer/sharer.php?u=${encUrl}" target="_blank" rel="noopener" title="Facebook">f</a>
+          <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encUrl}" target="_blank" rel="noopener" title="LinkedIn">in</a>
+          <button class="share-copy-btn" title="Copy link">⧉</button>
+        </div>
+      </div>
+    `;
+
     shell(`
       <div class="wrap article-layout">
-        <aside class="sidebar sidebar-left">
+        <!-- DESKTOP LEFT SIDEBAR -->
+        <aside class="sidebar sidebar-left desktop-only">
           <div class="side-block author-card">
             <a class="mini-avatar large" href="/author/${p.author.id}">${avatarImg(p.author)}</a>
             <div><a href="/author/${p.author.id}">${esc(p.author.displayName || p.author.username)}</a><small>${date(p.publishedAt || p.createdAt)} · ${p.readingTimeMinutes} min read</small></div>
           </div>
           ${p.categories.length ? `<div class="side-block"><b>Filed under</b>${p.categories.map((c) => `<a href="/category/${encodeURIComponent(c)}">${esc(c)}</a>`).join("")}</div>` : ""}
           
-          <!-- TOOLS (Moved on mobile) -->
-          <div class="side-block" id="sidebar-tools">
-            <b>Tools</b>
-            <button class="focus-btn" id="summary-btn">Read Summary</button>
-            <button class="focus-btn" id="focus-toggle">Focus Mode</button>
-            <button class="focus-btn" id="tts-toggle">🎧 Listen to Article</button>
-            <button class="focus-btn save-article-btn ${isSaved ? "saved" : ""}" id="save-article" data-id="${p.id}" data-title="${esc(p.title)}" data-img="${esc(p.mainImageUrl || "")}">${isSaved ? "Saved" : "Save for Later"}</button>
-          </div>
-          
-          <!-- SHARE (Moved on mobile) -->
-          <div class="side-block" id="sidebar-share">
-            <b>Share</b>
-            <div class="share-mini">
-              <a href="https://wa.me/?text=${shareText}%20${encUrl}" target="_blank" rel="noopener" title="WhatsApp">W</a>
-              <a href="https://twitter.com/intent/tweet?text=${shareText}&url=${encUrl}" target="_blank" rel="noopener" title="X">X</a>
-              <a href="https://www.facebook.com/sharer/sharer.php?u=${encUrl}" target="_blank" rel="noopener" title="Facebook">f</a>
-              <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encUrl}" target="_blank" rel="noopener" title="LinkedIn">in</a>
-              <button id="share-copy" title="Copy link">⧉</button>
-            </div>
-          </div>
+          ${toolsHtml}
+          ${shareHtml}
           
           <div class="ad-container-left">${renderAd(leftAdKey)}</div>
         </aside>
 
+        <!-- MAIN ARTICLE -->
         <article class="article-body" id="article-root">
+          <!-- MOBILE TOOLS (Above Title) -->
+          <div class="mobile-only mobile-tools-row">
+            ${toolsHtml}
+          </div>
+
           <div class="article-head"><div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div><h1>${esc(p.title)}</h1></div>
           ${p.mainImageUrl ? `<img class="article-cover" src="${esc(p.mainImageUrl)}" alt="">` : ""}
+          
           <div class="article-content" id="article-content">
             ${contentHtml}
             ${p.tags && p.tags.length ? `<div class="tag-list" style="margin-top:40px; margin-bottom: 20px;"><span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-right:10px">Keywords</span>${p.tags.map((t) => `<a href="/tag/${encodeURIComponent(t)}" class="tag" style="text-decoration:none">#${esc(t)}</a>`).join("")}</div>` : ""}
             <hr>
             <div class="author-bio"><span class="mini-avatar large">${avatarImg(p.author)}</span><div><b>Written by ${esc(p.author.displayName || p.author.username)}</b><p>${esc(p.author.bio || "A contributing writer at InkWell.")}</p></div></div>
+            
+            <!-- MOBILE SHARE (Below Author) -->
+            <div class="mobile-only mobile-share-row">
+              ${shareHtml}
+            </div>
           </div>
         </article>
 
+        <!-- DESKTOP RIGHT SIDEBAR -->
         <aside class="sidebar sidebar-right">
-          ${toc.length ? `<div class="side-block"><b>On this page</b><nav class="toc">${toc.map((t) => `<a class="toc-lv${t.level}" href="#${t.slug}" data-toc="${t.slug}">${esc(t.text)}</a>`).join("")}</nav></div>` : ""}
+          <div class="desktop-only">
+            ${toc.length ? `<div class="side-block"><b>On this page</b><nav class="toc">${toc.map((t) => `<a class="toc-lv${t.level}" href="#${t.slug}" data-toc="${t.slug}">${esc(t.text)}</a>`).join("")}</nav></div>` : ""}
+          </div>
           <div class="side-block"><b>More from InkWell</b><div id="related" class="related-list"></div></div>
           
           <div class="ad-container-right">${renderAd(rightAdKey)}</div>
@@ -760,263 +779,122 @@ async function postPage(id) {
       <div id="highlight-toolbar"><button id="btn-highlight">Highlight</button><button id="btn-undo-highlight" style="display:none;color:#f87171">Remove</button><button id="btn-copy">Copy</button></div>
     `);
 
-    // --- Mobile Layout Reordering ---
-    if (window.innerWidth <= 800) {
-      const tools = $("#sidebar-tools");
-      const share = $("#sidebar-share");
-      const articleBody = $(".article-body");
-      const articleContent = $("#article-content");
-      const articleHead = $(".article-head"); // Target the title area
-      
-      // Find the TOC block inside the right sidebar to hide it
-      const tocBlock = $(".sidebar-right .side-block:has(.toc)");
-
-      // 1. Move Tools to the VERY TOP (above the title)
-      if (tools && articleBody && articleHead) {
-        articleBody.insertBefore(tools, articleHead); 
-        tools.classList.add("mobile-tools-row");
-      }
-
-      // 2. Move Share to the BOTTOM (inside article content, after author bio)
-      if (share && articleContent) {
-        articleContent.appendChild(share);
-        share.classList.add("mobile-share-row");
-      }
-
-      // 3. Hide "On this page" (TOC) on mobile
-      if (tocBlock) {
-        tocBlock.style.display = 'none';
-      }
-    }
-
-    // 1. Reading Progress, TBR & Sidebar Sync
-    const progressBar = $("#reading-progress-bar");
-    const articleContent = $("#article-content");
-    const leftSidebar = $(".sidebar-left");
-    const rightSidebar = $(".sidebar-right");
-
-    window.onscroll = () => {
-      if (!articleContent) return;
-      const rect = articleContent.getBoundingClientRect();
-      const totalHeight = articleContent.scrollHeight - window.innerHeight;
-      const scrolled = Math.max(0, -rect.top);
-      const progress = Math.min(
-        100,
-        Math.max(0, (scrolled / totalHeight) * 100),
-      );
-      if (progressBar) progressBar.style.width = `${progress}%`;
-
-      if (progress > 10 && progress < 90) {
-        let list = store.get("library", []);
-        const item = list.find((x) => x.id === p.id);
-        if (item && item.state === "Saved") {
-          item.state = "In progress";
-          store.set("library", list);
-        }
-      } else if (progress >= 90) {
-        let list = store.get("library", []);
-        const item = list.find((x) => x.id === p.id);
-        if (item && item.state !== "Finished") {
-          item.state = "Finished";
-          store.set("library", list);
-          toast("Marked as Finished");
-        }
-      }
-
-      const maxScroll =
-        document.documentElement.scrollHeight - window.innerHeight;
-      const scrollFraction =
-        maxScroll > 0
-          ? Math.min(1, Math.max(0, window.scrollY / maxScroll))
-          : 0;
-      if (leftSidebar && leftSidebar.scrollHeight > leftSidebar.clientHeight)
-        leftSidebar.scrollTop =
-          scrollFraction *
-          (leftSidebar.scrollHeight - leftSidebar.clientHeight);
-      if (rightSidebar && rightSidebar.scrollHeight > rightSidebar.clientHeight)
-        rightSidebar.scrollTop =
-          scrollFraction *
-          (rightSidebar.scrollHeight - rightSidebar.clientHeight);
-    };
-
-    // 2. Save Article & Share
-    $("#save-article")?.addEventListener("click", function (e) {
-      toggleTBR(p.id, p.title, p.mainImageUrl, e);
+    // --- Event Listeners (Now using classes to target both desktop and mobile) ---
+    
+    // 1. Save & Share
+    $$(".save-article-btn").forEach(btn => {
+      btn.addEventListener("click", function (e) {
+        toggleTBR(p.id, p.title, p.mainImageUrl, e);
+      });
     });
-    $("#share-copy")?.addEventListener("click", () => {
-      navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied."));
+    $$(".share-copy-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied."));
+      });
     });
 
-    // 3. Generate Summary Logic (AI with Local Fallback)
-    $("#summary-btn")?.addEventListener("click", async () => {
-      const btn = $("#summary-btn");
-      const originalText = btn.innerHTML;
-      
-      // Show loading state
-      btn.innerHTML = "✨ Generating...";
-      btn.disabled = true;
-      btn.style.opacity = "0.7";
+    // 2. Summary (AI)
+    $$(".summary-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "✨ Generating...";
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
 
-      try {
-        // 1. Try calling the Groq AI endpoint
-        const response = await api(`/api/posts/${p.id}/summarize`, {
-          method: "POST"
-        });
-        openSummaryModal(p.title, p.author.displayName || p.author.username, response.summary);
-        
-      } catch (err) {
-        // 2. FALLBACK: If AI fails, use the local JS algorithm
-        console.warn("AI Summary failed, falling back to local algorithm.", err);
-        toast("AI unavailable. Generating local summary...", "error");
-        
-        // Clean the content to remove the title
-        let cleanContent = p.content;
-        const firstLine = cleanContent.split('\n')[0];
-        if (firstLine.includes(p.title) || firstLine.length < p.title.length + 5) {
-            cleanContent = cleanContent.substring(firstLine.length).trim();
+        try {
+          const response = await api(`/api/posts/${p.id}/summarize`, { method: "POST" });
+          openSummaryModal(p.title, p.author.displayName || p.author.username, response.summary);
+        } catch (err) {
+          console.warn("AI Summary failed, falling back.", err);
+          toast("AI unavailable. Generating local summary...", "error");
+          let cleanContent = p.content;
+          const firstLine = cleanContent.split('\n')[0];
+          if (firstLine.includes(p.title) || firstLine.length < p.title.length + 5) {
+              cleanContent = cleanContent.substring(firstLine.length).trim();
+          }
+          const localSummary = generateSummary(cleanContent);
+          openSummaryModal(p.title, p.author.displayName || p.author.username, localSummary);
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          btn.style.opacity = "1";
         }
-        
-        // Generate using local function
-        const localSummary = generateSummary(cleanContent);
-        openSummaryModal(p.title, p.author.displayName || p.author.username, localSummary);
-        
-      } finally {
-        // 3. Reset button state no matter what happened
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        btn.style.opacity = "1";
-      }
+      });
     });
 
-    // 4. Focus Mode
-    const focusToggle = $("#focus-toggle");
-    const focusExit = $("#focus-exit");
+    // 3. Focus Mode
     const enterFocus = () => {
       document.body.classList.add("focus-mode");
-      document.body.classList.add(
-        `focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`,
-      );
+      document.body.classList.add(`focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`);
     };
-    const exitFocus = () =>
-      document.body.classList.remove(
-        "focus-mode",
-        "focus-light",
-        "focus-sepia",
-        "focus-dark",
-      );
-    focusToggle?.addEventListener("click", enterFocus);
-    focusExit?.addEventListener("click", exitFocus);
+    const exitFocus = () => document.body.classList.remove("focus-mode", "focus-light", "focus-sepia", "focus-dark");
+    $$(".focus-toggle").forEach(btn => btn.addEventListener("click", enterFocus));
+    $("#focus-exit")?.addEventListener("click", exitFocus);
+    
     $$(".focus-themes button").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        document.body.classList.remove(
-          "focus-light",
-          "focus-sepia",
-          "focus-dark",
-        );
+        document.body.classList.remove("focus-light", "focus-sepia", "focus-dark");
         document.body.classList.add(`focus-${e.target.dataset.theme}`);
         localStorage.setItem("inkwell.focusTheme", e.target.dataset.theme);
       });
     });
     document.addEventListener("keydown", function escHandler(e) {
-      if (e.key === "Escape" && document.body.classList.contains("focus-mode"))
-        exitFocus();
+      if (e.key === "Escape" && document.body.classList.contains("focus-mode")) exitFocus();
     });
 
-    // 5. TTS (Listen)
-    let ttsBlocks = [];
-    let currentTtsIndex = 0;
-    let isTtsPlaying = false;
-    let isTtsPaused = false;
+    // 4. TTS
+    let ttsBlocks = []; let currentTtsIndex = 0; let isTtsPlaying = false; let isTtsPaused = false;
     let ignoreNextTtsClick = false;
 
     function initTTS() {
-      const nodes = articleContent.querySelectorAll(
-        "p, h2, h3, blockquote, li",
-      );
+      const nodes = $("#article-content").querySelectorAll("p, h2, h3, blockquote, li");
       ttsBlocks = Array.from(nodes);
       ttsBlocks.forEach((node, index) => {
         node.classList.add("tts-node");
         node.addEventListener("click", (e) => {
-          if (ignoreNextTtsClick) {
-            ignoreNextTtsClick = false;
-            return;
-          }
+          if (ignoreNextTtsClick) { ignoreNextTtsClick = false; return; }
           const sel = window.getSelection();
-          if (sel && sel.type === "Range" && sel.toString().trim().length > 0)
-            return;
+          if (sel && sel.type === "Range" && sel.toString().trim().length > 0) return;
           startTTS(index);
         });
       });
     }
     function startTTS(index) {
       if (!window.speechSynthesis) return toast("TTS not supported", "error");
-      stopTTS();
-      currentTtsIndex = index >= 0 ? index : 0;
-      isTtsPlaying = true;
-      isTtsPaused = false;
-      updateTtsUI();
-      playCurrentBlock();
+      stopTTS(); currentTtsIndex = index >= 0 ? index : 0; isTtsPlaying = true; isTtsPaused = false; updateTtsUI(); playCurrentBlock();
     }
     function playCurrentBlock() {
       if (currentTtsIndex >= ttsBlocks.length) return stopTTS();
-      const block = ttsBlocks[currentTtsIndex];
-      block.classList.add("tts-active");
-      block.scrollIntoView({ behavior: "smooth", block: "center" });
-      const text = block.innerText.trim();
-      if (!text) {
-        currentTtsIndex++;
-        return playCurrentBlock();
-      }
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.onend = () => {
-        block.classList.remove("tts-active");
-        if (isTtsPlaying && !isTtsPaused) {
-          currentTtsIndex++;
-          playCurrentBlock();
-        }
-      };
+      const block = ttsBlocks[currentTtsIndex]; block.classList.add("tts-active"); block.scrollIntoView({ behavior: "smooth", block: "center" });
+      const text = block.innerText.trim(); if (!text) { currentTtsIndex++; return playCurrentBlock(); }
+      const utterance = new SpeechSynthesisUtterance(text); utterance.rate = 1.0;
+      utterance.onend = () => { block.classList.remove("tts-active"); if (isTtsPlaying && !isTtsPaused) { currentTtsIndex++; playCurrentBlock(); } };
       window.speechSynthesis.speak(utterance);
     }
     function toggleTTS() {
       if (!isTtsPlaying) startTTS(0);
-      else if (isTtsPaused) {
-        window.speechSynthesis.resume();
-        isTtsPaused = false;
-        updateTtsUI();
-      } else {
-        window.speechSynthesis.pause();
-        isTtsPaused = true;
-        updateTtsUI();
-      }
+      else if (isTtsPaused) { window.speechSynthesis.resume(); isTtsPaused = false; updateTtsUI(); }
+      else { window.speechSynthesis.pause(); isTtsPaused = true; updateTtsUI(); }
     }
     function stopTTS() {
-      window.speechSynthesis.cancel();
-      isTtsPlaying = false;
-      isTtsPaused = false;
-      ttsBlocks.forEach((b) => b.classList.remove("tts-active"));
-      updateTtsUI();
+      window.speechSynthesis.cancel(); isTtsPlaying = false; isTtsPaused = false; ttsBlocks.forEach((b) => b.classList.remove("tts-active")); updateTtsUI();
     }
     function updateTtsUI() {
-      const btn = $("#tts-toggle");
-      if (!btn) return;
-      if (!isTtsPlaying) btn.textContent = "🎧 Listen to Article";
-      else if (isTtsPaused) btn.textContent = "▶️ Resume Listening";
-      else btn.textContent = "⏸ Pause Listening";
+      $$(".tts-toggle").forEach(btn => {
+        if (!isTtsPlaying) btn.textContent = "🎧 Listen to Article";
+        else if (isTtsPaused) btn.textContent = "▶️ Resume Listening";
+        else btn.textContent = "⏸ Pause Listening";
+      });
     }
-    $("#tts-toggle")?.addEventListener("click", toggleTTS);
+    $$(".tts-toggle").forEach(btn => btn.addEventListener("click", toggleTTS));
     window.addEventListener("hashchange", stopTTS, { once: true });
     initTTS();
 
-    // 6. Highlights
-    const toolbar = $("#highlight-toolbar");
-    let currentRange = null;
-    store
-      .get("highlights", [])
-      .filter((h) => h.postId === p.id)
-      .forEach((h) => applyHighlight(h.text));
+    // 5. Highlights (Same as before)
+    const toolbar = $("#highlight-toolbar"); let currentRange = null;
+    store.get("highlights", []).filter((h) => h.postId === p.id).forEach((h) => applyHighlight(h.text));
     toolbar.addEventListener("click", (e) => e.stopPropagation());
-
+    
     document.getElementById("article-root").addEventListener("mouseup", (e) => {
       if (toolbar.contains(e.target)) return;
       setTimeout(() => {
@@ -1034,7 +912,7 @@ async function postPage(id) {
       }, 10);
     });
 
-    articleContent.addEventListener("click", (e) => {
+    document.getElementById("article-content").addEventListener("click", (e) => {
       const mark = e.target.closest("mark.inkwell-highlight");
       if (mark && window.getSelection().isCollapsed) {
         ignoreNextTtsClick = true;
@@ -1050,96 +928,106 @@ async function postPage(id) {
       }
     });
 
-    document.addEventListener("mousedown", (e) => {
-      if (!toolbar.contains(e.target)) toolbar.classList.remove("active");
-    });
-
+    document.addEventListener("mousedown", (e) => { if (!toolbar.contains(e.target)) toolbar.classList.remove("active"); });
+    
     $("#btn-highlight")?.addEventListener("click", (e) => {
       if (!currentRange) return;
-      const text = currentRange.toString();
-      applyHighlight(text);
-      let list = store.get("highlights", []);
-      list.push({ postId: p.id, text, timestamp: Date.now() });
-      store.set("highlights", list);
-      triggerInkBurst(e);
-      window.getSelection().removeAllRanges();
-      toolbar.classList.remove("active");
-      toast("Highlight saved");
+      const text = currentRange.toString(); applyHighlight(text);
+      let list = store.get("highlights", []); list.push({ postId: p.id, text, timestamp: Date.now() }); store.set("highlights", list);
+      triggerInkBurst(e); window.getSelection().removeAllRanges(); toolbar.classList.remove("active"); toast("Highlight saved");
     });
 
     $("#btn-undo-highlight")?.addEventListener("click", () => {
       const mark = document.getElementById(toolbar.dataset.markId);
       if (mark) {
-        const text = mark.textContent;
-        const parent = mark.parentNode;
+        const text = mark.textContent; const parent = mark.parentNode;
         while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-        parent.removeChild(mark);
-        parent.normalize();
-        let list = store.get("highlights", []);
-        list = list.filter((h) => !(h.postId === p.id && h.text === text));
-        store.set("highlights", list);
-        toast("Highlight removed");
+        parent.removeChild(mark); parent.normalize();
+        let list = store.get("highlights", []); list = list.filter((h) => !(h.postId === p.id && h.text === text)); store.set("highlights", list); toast("Highlight removed");
       }
       toolbar.classList.remove("active");
     });
 
     $("#btn-copy")?.addEventListener("click", () => {
-      const textToCopy = currentRange
-        ? currentRange.toString()
-        : document.getElementById(toolbar.dataset.markId)?.textContent;
-      if (textToCopy)
-        navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
-      toast("Quote copied");
-      toolbar.classList.remove("active");
+      const textToCopy = currentRange ? currentRange.toString() : document.getElementById(toolbar.dataset.markId)?.textContent;
+      if (textToCopy) navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
+      toast("Quote copied"); toolbar.classList.remove("active");
     });
 
     function applyHighlight(text) {
-      const walker = document.createTreeWalker(
-        articleContent,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false,
-      );
+      const walker = document.createTreeWalker(document.getElementById("article-content"), NodeFilter.SHOW_TEXT, null, false);
       let node;
       while ((node = walker.nextNode())) {
         const idx = node.nodeValue.indexOf(text);
         if (idx > -1) {
-          const range = document.createRange();
-          range.setStart(node, idx);
-          range.setEnd(node, idx + text.length);
-          const mark = document.createElement("mark");
-          mark.className = "inkwell-highlight";
-          range.surroundContents(mark);
-          break;
+          const range = document.createRange(); range.setStart(node, idx); range.setEnd(node, idx + text.length);
+          const mark = document.createElement("mark"); mark.className = "inkwell-highlight"; range.surroundContents(mark); break;
         }
       }
     }
 
-    // 7. Related Posts & TOC
-    $$(".toc a").forEach((a) =>
-      a.addEventListener("click", (e) => {
-        e.preventDefault();
-        document
-          .getElementById(a.dataset.toc)
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }),
-    );
+    // 6. Related Posts & TOC
+    $$(".toc a").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById(a.dataset.toc)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
+
     try {
       const list = await api("/api/posts?page=1");
       const others = list.items.filter((x) => x.id !== p.id).slice(0, 4);
-      $("#related").innerHTML = others.length
-        ? others
-            .map(
-              (r) =>
-                `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
-            )
-            .join("")
-        : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
+      $("#related").innerHTML = others.length ? others.map((r) => `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`).join("") : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
     } catch {}
+
+        // 7. Reading Progress & Sidebar Sync
+    const progressBar = $("#reading-progress-bar");
+    const leftSidebar = $(".sidebar-left");
+    const rightSidebar = $(".sidebar-right");
+
+    window.onscroll = () => {
+      const articleContent = $("#article-content");
+      if (!articleContent) return;
+
+      // 1. Reading Progress Bar
+      const rect = articleContent.getBoundingClientRect();
+      const totalHeight = articleContent.scrollHeight - window.innerHeight;
+      const scrolled = Math.max(0, -rect.top);
+      const progress = Math.min(100, Math.max(0, (scrolled / totalHeight) * 100));
+      if (progressBar) progressBar.style.width = `${progress}%`;
+
+      // 2. TBR Auto-tracking
+      if (progress > 10 && progress < 90) {
+        let list = store.get("library", []);
+        const item = list.find((x) => x.id === p.id);
+        if (item && item.state === "Saved") {
+          item.state = "In progress";
+          store.set("library", list);
+        }
+      } else if (progress >= 90) {
+        let list = store.get("library", []);
+        const item = list.find((x) => x.id === p.id);
+        if (item && item.state !== "Finished") {
+          item.state = "Finished";
+          store.set("library", list);
+          toast("Marked as Finished");
+        }
+      }
+
+      // 3. Sidebar Sync (Only on Desktop)
+      if (window.innerWidth > 800) {
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        const scrollFraction = maxScroll > 0 ? Math.min(1, Math.max(0, window.scrollY / maxScroll)) : 0;
+
+        if (leftSidebar && leftSidebar.scrollHeight > leftSidebar.clientHeight) {
+          leftSidebar.scrollTop = scrollFraction * (leftSidebar.scrollHeight - leftSidebar.clientHeight);
+        }
+        if (rightSidebar && rightSidebar.scrollHeight > rightSidebar.clientHeight) {
+          rightSidebar.scrollTop = scrollFraction * (rightSidebar.scrollHeight - rightSidebar.clientHeight);
+        }
+      }
+    };
+
   } catch (e) {
-    shell(
-      `<section class="wrap page-head">${empty(e.message, "Back home", "/")}</section>`,
-    );
+    shell(`<section class="wrap page-head">${empty(e.message, "Back home", "/")}</section>`);
   }
 }
 
@@ -1345,7 +1233,7 @@ async function editor() {
   if (!guard(["Editor", "Admin"])) return;
   updateMeta("Dashboard — InkWell", "Your writing desk.");
   shell(
-    `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Your writing desk</div><h1>Hello, ${esc(state.user.displayName || state.user.username)}.</h1></div><a class="button" href="/editor/new">New article +</a></div><div class="stats" id="editor-stats"></div><div class="table-wrap"><div class="section-heading"><h2>Your stories</h2></div><div id="my-posts"></div></div></section>`,
+    `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Your writing desk</div><h1>Hello, ${esc(state.user.displayName || state.user.username)}.</h1></div><a class="button" href="/editor/new">New article +</a></div><div class="stats" id="editor-stats"></div><div class="table-wrap"><div class="section-heading"><h2>Your articles</h2></div><div id="my-posts"></div></div></section>`,
   );
   const posts = await api("/api/posts/mine");
   const counts = ["Draft", "PendingReview", "Published", "Rejected"].map(
@@ -1566,7 +1454,7 @@ async function admin() {
     api("/api/admin/users"),
   ]);
   $("#admin-stats").innerHTML = [
-    [stats.pendingPosts, "Stories to review"],
+    [stats.pendingPosts, "Articles to review"],
     [stats.pendingApplications, "Applications"],
     [stats.published, "Published"],
     [stats.editors, "Editors"],

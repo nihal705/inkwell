@@ -2189,97 +2189,49 @@ mark.inkwell-highlight:hover {
   min-width: 0; /* Prevents grid blowout */
 }
 
-/* === MOBILE POST PAGE LAYOUT FIX === */
+/* === MOBILE POST PAGE LAYOUT === */
 @media (max-width: 800px) {
-  /* Ensure the moved blocks look correct */
-  .article-content .share-block {
-    margin-bottom: 0;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 18px;
-  }
-  
-  .article-content .tools-block {
-    margin-bottom: 0;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 18px;
-  }
-}
-
-/* === AD CONTAINERS === */
-.ad-container-left,
-.ad-container-right {
-  margin-top: 16px;
-}
-
-/* === MOBILE POST PAGE FIX === */
-@media (max-width: 800px) {
-  /* Style the moved blocks so they look identical to side-blocks */
-  #sidebar-share, 
-  #sidebar-tools {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 18px;
-    margin-bottom: 0;
-  }
-  
-  /* Ensure the right sidebar stacks properly at the bottom */
-  .sidebar-right {
-    margin-top: 30px;
-  }
-}
-
-/* === MOBILE POST PAGE FIX === */
-@media (max-width: 800px) {
-  /* Style the moved blocks so they look like proper cards */
-  #sidebar-share, 
-  #sidebar-tools {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 18px;
-    margin-bottom: 0;
-  }
-  
-  /* Ensure the right sidebar stacks properly at the bottom */
-  .sidebar-right {
-    margin-top: 30px;
-  }
-}
-
-/* === MOBILE POST PAGE ROW LAYOUTS === */
-@media (max-width: 800px) {
-  .sidebar-left { 
+  /* 1. Visibility Rules */
+  .sidebar-left, 
+  .desktop-only { 
     display: none !important; 
   }
+  .mobile-only { 
+    display: block !important; 
+  }
 
+  /* 2. TOOLS ROW (Single Block) */
   .mobile-tools-row {
     display: flex !important;
-    flex-wrap: nowrap !important; 
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     gap: 6px;
-    margin-bottom: 24px;
     padding: 10px !important;
+    margin-bottom: 24px;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 12px;
-    overflow-x: auto; 
-    scrollbar-width: none; 
+    overflow-x: auto;
+    scrollbar-width: none;
   }
-  .mobile-tools-row::-webkit-scrollbar {
-    display: none;
+  .mobile-tools-row::-webkit-scrollbar { display: none; }
+  
+  /* Make inner block invisible */
+  .mobile-tools-row .tools-block {
+    display: flex !important;
+    flex: 1;
+    gap: 6px;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
   }
-
-  .mobile-tools-row b {
-    display: none !important;
-  }
-
-  /* Make buttons fit in the row */
+  .mobile-tools-row .tools-block b { display: none !important; }
+  
+  /* Button Styling */
   .mobile-tools-row .focus-btn {
-    flex: 1; 
+    flex: 1;
     min-width: 0;
     padding: 10px 4px !important;
     font-size: 11px !important;
@@ -2289,15 +2241,14 @@ mark.inkwell-highlight:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
     margin: 0 !important;
-    background: var(--paper); 
-    color: var(--ink);       
+    background: var(--paper);
+    color: var(--ink);
     border: 1px solid var(--line) !important;
     border-radius: 8px !important;
   }
 
-  /* 2. SHARE ROW (Bottom) */
+  /* 3. SHARE ROW (Single Block) */
   .mobile-share-row {
     display: flex !important;
     align-items: center;
@@ -2308,58 +2259,53 @@ mark.inkwell-highlight:hover {
     border: 1px solid var(--line);
     border-radius: 12px;
   }
-  .mobile-share-row b {
+  
+  /* Make inner block invisible */
+  .mobile-share-row .share-block {
+    display: flex !important;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
+  
+  .mobile-share-row .share-block b {
     margin-bottom: 0 !important;
     font-size: 14px;
+    color: var(--muted);
   }
   .mobile-share-row .share-mini {
     margin-bottom: 0 !important;
   }
 
-  .article-content {
-    padding-bottom: 20px !important;
-  }
-  .sidebar-right {
-    margin-top: 10px !important;
-    padding-top: 0 !important;
-  }
-  .sidebar-right .side-block:first-child {
-    margin-top: 0 !important;
-  }
+  /* 4. Spacing Fixes */
+  .article-content { padding-bottom: 20px !important; }
+  .sidebar-right { margin-top: 10px !important; padding-top: 0 !important; }
+  .sidebar-right .side-block:first-child { margin-top: 0 !important; }
 }
 
-/* Ensure the sidebars have the correct background and text color in both themes */
-.sidebar .side-block {
-  background: var(--surface) !important;
-  border: 1px solid var(--line) !important;
-  color: var(--ink) !important;
-}
-
-/* Base style for the tool buttons on Desktop */
+/* 5. Dark Mode Fix for Desktop Tools */
 .focus-btn {
   background: var(--paper) !important;
   color: var(--ink) !important;
   border: 1px solid var(--line) !important;
   transition: all 0.2s ease;
 }
-
 .focus-btn:hover {
   background: var(--soft) !important;
   border-color: var(--accent) !important;
   color: var(--accent) !important;
   transform: translateY(-1px);
 }
-
-.sidebar .side-block > b {
-  color: var(--muted) !important;
-}
-
 [data-theme="dark"] .focus-btn {
-  background: #1a1815 !important; 
+  background: #1a1815 !important;
   color: var(--ink) !important;
 }
-
 [data-theme="dark"] .focus-btn:hover {
-  background: var(--soft) !important; 
+  background: var(--soft) !important;
   color: var(--accent) !important;
 }
