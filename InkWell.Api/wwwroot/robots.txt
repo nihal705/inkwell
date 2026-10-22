@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://inkwell-3m7y.onrender.com/sitemap.xml
