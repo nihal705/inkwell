@@ -237,22 +237,56 @@ function markdown(text) {
 // ==================== LOCAL FALLBACK SUMMARIZER ====================
 function generateSummary(content) {
   let text = content
-    .replace(/!\[.*?\]\(.*?\)/g, "")       
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") 
-    .replace(/^#+\s+.*$/gm, "")            
-    .replace(/^\s*[-*+]\s+/gm, "")         
-    .replace(/[#*_>`]/g, "")               
-    .replace(/\n+/g, " ")                  
+    .replace(/!\[.*?\]\(.*?\)/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/^#+\s+.*$/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/[#*_>`]/g, "")
+    .replace(/\n+/g, " ")
     .trim();
 
   const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
   if (sentences.length <= 4) return sentences.join(" ");
 
-  const stopWords = new Set(["the", "and", "a", "to", "of", "in", "i", "is", "that", "it", "on", "you", "this", "for", "but", "with", "are", "have", "be", "at", "or", "as", "was", "so", "if", "out", "not", "we", "they", "he", "she", "my", "our"]);
+  const stopWords = new Set([
+    "the",
+    "and",
+    "a",
+    "to",
+    "of",
+    "in",
+    "i",
+    "is",
+    "that",
+    "it",
+    "on",
+    "you",
+    "this",
+    "for",
+    "but",
+    "with",
+    "are",
+    "have",
+    "be",
+    "at",
+    "or",
+    "as",
+    "was",
+    "so",
+    "if",
+    "out",
+    "not",
+    "we",
+    "they",
+    "he",
+    "she",
+    "my",
+    "our",
+  ]);
   const wordFreq = {};
   const words = text.toLowerCase().match(/\b\w+\b/g) || [];
-  
-  words.forEach(word => {
+
+  words.forEach((word) => {
     if (!stopWords.has(word) && word.length > 2) {
       wordFreq[word] = (wordFreq[word] || 0) + 1;
     }
@@ -261,7 +295,7 @@ function generateSummary(content) {
   const sentenceScores = sentences.map((sentence, index) => {
     const sentenceWords = sentence.toLowerCase().match(/\b\w+\b/g) || [];
     let score = 0;
-    sentenceWords.forEach(word => {
+    sentenceWords.forEach((word) => {
       if (wordFreq[word]) score += wordFreq[word];
     });
     score = score / (sentenceWords.length || 1);
@@ -269,13 +303,16 @@ function generateSummary(content) {
     return { sentence: sentence.trim(), score, index };
   });
 
-  const sentenceCount = Math.min(8, Math.max(3, Math.ceil(sentences.length * 0.3)));
+  const sentenceCount = Math.min(
+    8,
+    Math.max(3, Math.ceil(sentences.length * 0.3)),
+  );
 
   const topSentences = sentenceScores
     .sort((a, b) => b.score - a.score)
     .slice(0, sentenceCount)
     .sort((a, b) => a.index - b.index)
-    .map(s => s.sentence);
+    .map((s) => s.sentence);
 
   return topSentences.join(" ");
 }
@@ -434,31 +471,47 @@ function openSummaryModal(title, author, summary) {
   const target = $("#share-preview-target", modal);
 
   $("#btn-download", modal).onclick = async () => {
-    if (typeof htmlToImage === 'undefined') return toast("Image library not loaded yet.", "error");
+    if (typeof htmlToImage === "undefined")
+      return toast("Image library not loaded yet.", "error");
     try {
       toast("Generating image...");
-      const dataUrl = await htmlToImage.toPng(target, { quality: 1.0, pixelRatio: 2 });
+      const dataUrl = await htmlToImage.toPng(target, {
+        quality: 1.0,
+        pixelRatio: 2,
+      });
       const a = document.createElement("a");
       a.href = dataUrl;
       a.download = "inkwell-summary.png";
       a.click();
       toast("Image downloaded!");
-    } catch (err) { toast("Failed to generate image", "error"); }
+    } catch (err) {
+      toast("Failed to generate image", "error");
+    }
   };
 
   $("#btn-native-share", modal).onclick = async () => {
-    if (typeof htmlToImage === 'undefined') return toast("Image library not loaded yet.", "error");
+    if (typeof htmlToImage === "undefined")
+      return toast("Image library not loaded yet.", "error");
     try {
-      const dataUrl = await htmlToImage.toPng(target, { quality: 1.0, pixelRatio: 2 });
+      const dataUrl = await htmlToImage.toPng(target, {
+        quality: 1.0,
+        pixelRatio: 2,
+      });
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], "summary.png", { type: "image/png" });
-      
+
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: "InkWell Summary", text: `"${title}" — ${author}` });
+        await navigator.share({
+          files: [file],
+          title: "InkWell Summary",
+          text: `"${title}" — ${author}`,
+        });
       } else {
         toast("Native sharing not supported. Download instead.", "error");
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 }
 
@@ -510,7 +563,6 @@ async function home() {
     $("#posts").innerHTML = data.items.length
       ? data.items.map(card).join("")
       : empty("No articles match that search.", "Clear filters", "/");
-    
   } catch (e) {
     $("#posts").innerHTML = empty(
       "The library is waking up.",
@@ -680,7 +732,9 @@ async function postPage(id) {
       p.mainImageUrl,
     );
 
-    const isSaved = store.get("library", []).some((x) => String(x.id) === String(p.id));
+    const isSaved = store
+      .get("library", [])
+      .some((x) => String(x.id) === String(p.id));
     const toc = [];
     p.content.replace(/^(##|###) (.+)$/gm, (m, hashes, text) =>
       toc.push({ level: hashes.length, text, slug: slugify(text) }),
@@ -690,7 +744,7 @@ async function postPage(id) {
     const shareText = encodeURIComponent(p.title + " — InkWell");
     const encUrl = encodeURIComponent(shareUrl);
 
-    // --- Generate Two Different Ads ---
+    // Generate Two Different Ads for Desktop
     const adKeys = ["mycodendotes", "kwikcric"];
     const leftAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
     let rightAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
@@ -700,7 +754,7 @@ async function postPage(id) {
       }
     }
 
-    // --- Reusable HTML Blocks ---
+    // Reusable HTML Blocks
     const toolsHtml = `
       <div class="side-block tools-block">
         <b>Tools</b>
@@ -742,6 +796,7 @@ async function postPage(id) {
 
         <!-- MAIN ARTICLE -->
         <article class="article-body" id="article-root">
+          
           <!-- MOBILE TOOLS (Above Title) -->
           <div class="mobile-only mobile-tools-row">
             ${toolsHtml}
@@ -779,41 +834,50 @@ async function postPage(id) {
       <div id="highlight-toolbar"><button id="btn-highlight">Highlight</button><button id="btn-undo-highlight" style="display:none;color:#f87171">Remove</button><button id="btn-copy">Copy</button></div>
     `);
 
-    // --- Event Listeners (Now using classes to target both desktop and mobile) ---
-    
-    // 1. Save & Share
-    $$(".save-article-btn").forEach(btn => {
+    // --- ALL EVENT LISTENERS ---
+    $$(".save-article-btn").forEach((btn) =>
       btn.addEventListener("click", function (e) {
         toggleTBR(p.id, p.title, p.mainImageUrl, e);
-      });
-    });
-    $$(".share-copy-btn").forEach(btn => {
+      }),
+    );
+    $$(".share-copy-btn").forEach((btn) =>
       btn.addEventListener("click", () => {
-        navigator.clipboard.writeText(shareUrl).then(() => toast("Link copied."));
-      });
-    });
+        navigator.clipboard
+          .writeText(shareUrl)
+          .then(() => toast("Link copied."));
+      }),
+    );
 
-    // 2. Summary (AI)
-    $$(".summary-btn").forEach(btn => {
+    // Summary
+    $$(".summary-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const originalText = btn.innerHTML;
         btn.innerHTML = "✨ Generating...";
         btn.disabled = true;
         btn.style.opacity = "0.7";
-
         try {
-          const response = await api(`/api/posts/${p.id}/summarize`, { method: "POST" });
-          openSummaryModal(p.title, p.author.displayName || p.author.username, response.summary);
+          const response = await api(`/api/posts/${p.id}/summarize`, {
+            method: "POST",
+          });
+          openSummaryModal(
+            p.title,
+            p.author.displayName || p.author.username,
+            response.summary,
+          );
         } catch (err) {
-          console.warn("AI Summary failed, falling back.", err);
           toast("AI unavailable. Generating local summary...", "error");
           let cleanContent = p.content;
-          const firstLine = cleanContent.split('\n')[0];
-          if (firstLine.includes(p.title) || firstLine.length < p.title.length + 5) {
-              cleanContent = cleanContent.substring(firstLine.length).trim();
-          }
-          const localSummary = generateSummary(cleanContent);
-          openSummaryModal(p.title, p.author.displayName || p.author.username, localSummary);
+          const firstLine = cleanContent.split("\n")[0];
+          if (
+            firstLine.includes(p.title) ||
+            firstLine.length < p.title.length + 5
+          )
+            cleanContent = cleanContent.substring(firstLine.length).trim();
+          openSummaryModal(
+            p.title,
+            p.author.displayName || p.author.username,
+            generateSummary(cleanContent),
+          );
         } finally {
           btn.innerHTML = originalText;
           btn.disabled = false;
@@ -822,79 +886,135 @@ async function postPage(id) {
       });
     });
 
-    // 3. Focus Mode
+    // Focus Mode
     const enterFocus = () => {
       document.body.classList.add("focus-mode");
-      document.body.classList.add(`focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`);
+      document.body.classList.add(
+        `focus-${localStorage.getItem("inkwell.focusTheme") || "light"}`,
+      );
     };
-    const exitFocus = () => document.body.classList.remove("focus-mode", "focus-light", "focus-sepia", "focus-dark");
-    $$(".focus-toggle").forEach(btn => btn.addEventListener("click", enterFocus));
+    const exitFocus = () =>
+      document.body.classList.remove(
+        "focus-mode",
+        "focus-light",
+        "focus-sepia",
+        "focus-dark",
+      );
+    $$(".focus-toggle").forEach((btn) =>
+      btn.addEventListener("click", enterFocus),
+    );
     $("#focus-exit")?.addEventListener("click", exitFocus);
-    
-    $$(".focus-themes button").forEach((btn) => {
+    $$(".focus-themes button").forEach((btn) =>
       btn.addEventListener("click", (e) => {
-        document.body.classList.remove("focus-light", "focus-sepia", "focus-dark");
+        document.body.classList.remove(
+          "focus-light",
+          "focus-sepia",
+          "focus-dark",
+        );
         document.body.classList.add(`focus-${e.target.dataset.theme}`);
         localStorage.setItem("inkwell.focusTheme", e.target.dataset.theme);
-      });
-    });
+      }),
+    );
     document.addEventListener("keydown", function escHandler(e) {
-      if (e.key === "Escape" && document.body.classList.contains("focus-mode")) exitFocus();
+      if (e.key === "Escape" && document.body.classList.contains("focus-mode"))
+        exitFocus();
     });
 
-    // 4. TTS
-    let ttsBlocks = []; let currentTtsIndex = 0; let isTtsPlaying = false; let isTtsPaused = false;
+    // TTS
+    let ttsBlocks = [];
+    let currentTtsIndex = 0;
+    let isTtsPlaying = false;
+    let isTtsPaused = false;
     let ignoreNextTtsClick = false;
-
     function initTTS() {
-      const nodes = $("#article-content").querySelectorAll("p, h2, h3, blockquote, li");
+      const nodes = $("#article-content").querySelectorAll(
+        "p, h2, h3, blockquote, li",
+      );
       ttsBlocks = Array.from(nodes);
       ttsBlocks.forEach((node, index) => {
         node.classList.add("tts-node");
         node.addEventListener("click", (e) => {
-          if (ignoreNextTtsClick) { ignoreNextTtsClick = false; return; }
+          if (ignoreNextTtsClick) {
+            ignoreNextTtsClick = false;
+            return;
+          }
           const sel = window.getSelection();
-          if (sel && sel.type === "Range" && sel.toString().trim().length > 0) return;
+          if (sel && sel.type === "Range" && sel.toString().trim().length > 0)
+            return;
           startTTS(index);
         });
       });
     }
     function startTTS(index) {
       if (!window.speechSynthesis) return toast("TTS not supported", "error");
-      stopTTS(); currentTtsIndex = index >= 0 ? index : 0; isTtsPlaying = true; isTtsPaused = false; updateTtsUI(); playCurrentBlock();
+      stopTTS();
+      currentTtsIndex = index >= 0 ? index : 0;
+      isTtsPlaying = true;
+      isTtsPaused = false;
+      updateTtsUI();
+      playCurrentBlock();
     }
     function playCurrentBlock() {
       if (currentTtsIndex >= ttsBlocks.length) return stopTTS();
-      const block = ttsBlocks[currentTtsIndex]; block.classList.add("tts-active"); block.scrollIntoView({ behavior: "smooth", block: "center" });
-      const text = block.innerText.trim(); if (!text) { currentTtsIndex++; return playCurrentBlock(); }
-      const utterance = new SpeechSynthesisUtterance(text); utterance.rate = 1.0;
-      utterance.onend = () => { block.classList.remove("tts-active"); if (isTtsPlaying && !isTtsPaused) { currentTtsIndex++; playCurrentBlock(); } };
+      const block = ttsBlocks[currentTtsIndex];
+      block.classList.add("tts-active");
+      block.scrollIntoView({ behavior: "smooth", block: "center" });
+      const text = block.innerText.trim();
+      if (!text) {
+        currentTtsIndex++;
+        return playCurrentBlock();
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.onend = () => {
+        block.classList.remove("tts-active");
+        if (isTtsPlaying && !isTtsPaused) {
+          currentTtsIndex++;
+          playCurrentBlock();
+        }
+      };
       window.speechSynthesis.speak(utterance);
     }
     function toggleTTS() {
       if (!isTtsPlaying) startTTS(0);
-      else if (isTtsPaused) { window.speechSynthesis.resume(); isTtsPaused = false; updateTtsUI(); }
-      else { window.speechSynthesis.pause(); isTtsPaused = true; updateTtsUI(); }
+      else if (isTtsPaused) {
+        window.speechSynthesis.resume();
+        isTtsPaused = false;
+        updateTtsUI();
+      } else {
+        window.speechSynthesis.pause();
+        isTtsPaused = true;
+        updateTtsUI();
+      }
     }
     function stopTTS() {
-      window.speechSynthesis.cancel(); isTtsPlaying = false; isTtsPaused = false; ttsBlocks.forEach((b) => b.classList.remove("tts-active")); updateTtsUI();
+      window.speechSynthesis.cancel();
+      isTtsPlaying = false;
+      isTtsPaused = false;
+      ttsBlocks.forEach((b) => b.classList.remove("tts-active"));
+      updateTtsUI();
     }
     function updateTtsUI() {
-      $$(".tts-toggle").forEach(btn => {
+      $$(".tts-toggle").forEach((btn) => {
         if (!isTtsPlaying) btn.textContent = "🎧 Listen to Article";
         else if (isTtsPaused) btn.textContent = "▶️ Resume Listening";
         else btn.textContent = "⏸ Pause Listening";
       });
     }
-    $$(".tts-toggle").forEach(btn => btn.addEventListener("click", toggleTTS));
+    $$(".tts-toggle").forEach((btn) =>
+      btn.addEventListener("click", toggleTTS),
+    );
     window.addEventListener("hashchange", stopTTS, { once: true });
     initTTS();
 
-    // 5. Highlights (Same as before)
-    const toolbar = $("#highlight-toolbar"); let currentRange = null;
-    store.get("highlights", []).filter((h) => h.postId === p.id).forEach((h) => applyHighlight(h.text));
+    // Highlights
+    const toolbar = $("#highlight-toolbar");
+    let currentRange = null;
+    store
+      .get("highlights", [])
+      .filter((h) => h.postId === p.id)
+      .forEach((h) => applyHighlight(h.text));
     toolbar.addEventListener("click", (e) => e.stopPropagation());
-    
     document.getElementById("article-root").addEventListener("mouseup", (e) => {
       if (toolbar.contains(e.target)) return;
       setTimeout(() => {
@@ -911,90 +1031,121 @@ async function postPage(id) {
         }
       }, 10);
     });
-
-    document.getElementById("article-content").addEventListener("click", (e) => {
-      const mark = e.target.closest("mark.inkwell-highlight");
-      if (mark && window.getSelection().isCollapsed) {
-        ignoreNextTtsClick = true;
-        currentRange = null;
-        const rect = mark.getBoundingClientRect();
-        toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
-        toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
-        toolbar.classList.add("active");
-        $("#btn-highlight").style.display = "none";
-        $("#btn-undo-highlight").style.display = "block";
-        toolbar.dataset.markId = mark.id || `mark-${Date.now()}`;
-        if (!mark.id) mark.id = toolbar.dataset.markId;
-      }
+    document
+      .getElementById("article-content")
+      .addEventListener("click", (e) => {
+        const mark = e.target.closest("mark.inkwell-highlight");
+        if (mark && window.getSelection().isCollapsed) {
+          ignoreNextTtsClick = true;
+          currentRange = null;
+          const rect = mark.getBoundingClientRect();
+          toolbar.style.left = `${rect.left + rect.width / 2 + window.scrollX}px`;
+          toolbar.style.top = `${rect.top + window.scrollY - 10}px`;
+          toolbar.classList.add("active");
+          $("#btn-highlight").style.display = "none";
+          $("#btn-undo-highlight").style.display = "block";
+          toolbar.dataset.markId = mark.id || `mark-${Date.now()}`;
+          if (!mark.id) mark.id = toolbar.dataset.markId;
+        }
+      });
+    document.addEventListener("mousedown", (e) => {
+      if (!toolbar.contains(e.target)) toolbar.classList.remove("active");
     });
-
-    document.addEventListener("mousedown", (e) => { if (!toolbar.contains(e.target)) toolbar.classList.remove("active"); });
-    
     $("#btn-highlight")?.addEventListener("click", (e) => {
       if (!currentRange) return;
-      const text = currentRange.toString(); applyHighlight(text);
-      let list = store.get("highlights", []); list.push({ postId: p.id, text, timestamp: Date.now() }); store.set("highlights", list);
-      triggerInkBurst(e); window.getSelection().removeAllRanges(); toolbar.classList.remove("active"); toast("Highlight saved");
+      const text = currentRange.toString();
+      applyHighlight(text);
+      let list = store.get("highlights", []);
+      list.push({ postId: p.id, text, timestamp: Date.now() });
+      store.set("highlights", list);
+      triggerInkBurst(e);
+      window.getSelection().removeAllRanges();
+      toolbar.classList.remove("active");
+      toast("Highlight saved");
     });
-
     $("#btn-undo-highlight")?.addEventListener("click", () => {
       const mark = document.getElementById(toolbar.dataset.markId);
       if (mark) {
-        const text = mark.textContent; const parent = mark.parentNode;
+        const text = mark.textContent;
+        const parent = mark.parentNode;
         while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-        parent.removeChild(mark); parent.normalize();
-        let list = store.get("highlights", []); list = list.filter((h) => !(h.postId === p.id && h.text === text)); store.set("highlights", list); toast("Highlight removed");
+        parent.removeChild(mark);
+        parent.normalize();
+        let list = store.get("highlights", []);
+        list = list.filter((h) => !(h.postId === p.id && h.text === text));
+        store.set("highlights", list);
+        toast("Highlight removed");
       }
       toolbar.classList.remove("active");
     });
-
     $("#btn-copy")?.addEventListener("click", () => {
-      const textToCopy = currentRange ? currentRange.toString() : document.getElementById(toolbar.dataset.markId)?.textContent;
-      if (textToCopy) navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
-      toast("Quote copied"); toolbar.classList.remove("active");
+      const textToCopy = currentRange
+        ? currentRange.toString()
+        : document.getElementById(toolbar.dataset.markId)?.textContent;
+      if (textToCopy)
+        navigator.clipboard.writeText(`"${textToCopy}"\n— ${p.title}`);
+      toast("Quote copied");
+      toolbar.classList.remove("active");
     });
-
     function applyHighlight(text) {
-      const walker = document.createTreeWalker(document.getElementById("article-content"), NodeFilter.SHOW_TEXT, null, false);
+      const walker = document.createTreeWalker(
+        document.getElementById("article-content"),
+        NodeFilter.SHOW_TEXT,
+        null,
+        false,
+      );
       let node;
       while ((node = walker.nextNode())) {
         const idx = node.nodeValue.indexOf(text);
         if (idx > -1) {
-          const range = document.createRange(); range.setStart(node, idx); range.setEnd(node, idx + text.length);
-          const mark = document.createElement("mark"); mark.className = "inkwell-highlight"; range.surroundContents(mark); break;
+          const range = document.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, idx + text.length);
+          const mark = document.createElement("mark");
+          mark.className = "inkwell-highlight";
+          range.surroundContents(mark);
+          break;
         }
       }
     }
 
-    // 6. Related Posts & TOC
-    $$(".toc a").forEach((a) => a.addEventListener("click", (e) => {
-      e.preventDefault();
-      document.getElementById(a.dataset.toc)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }));
-
+    // Related & TOC
+    $$(".toc a").forEach((a) =>
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        document
+          .getElementById(a.dataset.toc)
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }),
+    );
     try {
       const list = await api("/api/posts?page=1");
       const others = list.items.filter((x) => x.id !== p.id).slice(0, 4);
-      $("#related").innerHTML = others.length ? others.map((r) => `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`).join("") : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
+      $("#related").innerHTML = others.length
+        ? others
+            .map(
+              (r) =>
+                `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
+            )
+            .join("")
+        : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
     } catch {}
 
-        // 7. Reading Progress & Sidebar Sync
+    // Scroll Sync
     const progressBar = $("#reading-progress-bar");
     const leftSidebar = $(".sidebar-left");
     const rightSidebar = $(".sidebar-right");
-
     window.onscroll = () => {
       const articleContent = $("#article-content");
       if (!articleContent) return;
-
-      // 1. Reading Progress Bar
       const rect = articleContent.getBoundingClientRect();
       const totalHeight = articleContent.scrollHeight - window.innerHeight;
       const scrolled = Math.max(0, -rect.top);
-      const progress = Math.min(100, Math.max(0, (scrolled / totalHeight) * 100));
+      const progress = Math.min(
+        100,
+        Math.max(0, (scrolled / totalHeight) * 100),
+      );
       if (progressBar) progressBar.style.width = `${progress}%`;
-
-      // 2. TBR Auto-tracking
       if (progress > 10 && progress < 90) {
         let list = store.get("library", []);
         const item = list.find((x) => x.id === p.id);
@@ -1011,23 +1162,30 @@ async function postPage(id) {
           toast("Marked as Finished");
         }
       }
-
-      // 3. Sidebar Sync (Only on Desktop)
       if (window.innerWidth > 800) {
-        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-        const scrollFraction = maxScroll > 0 ? Math.min(1, Math.max(0, window.scrollY / maxScroll)) : 0;
-
-        if (leftSidebar && leftSidebar.scrollHeight > leftSidebar.clientHeight) {
-          leftSidebar.scrollTop = scrollFraction * (leftSidebar.scrollHeight - leftSidebar.clientHeight);
-        }
-        if (rightSidebar && rightSidebar.scrollHeight > rightSidebar.clientHeight) {
-          rightSidebar.scrollTop = scrollFraction * (rightSidebar.scrollHeight - rightSidebar.clientHeight);
-        }
+        const maxScroll =
+          document.documentElement.scrollHeight - window.innerHeight;
+        const scrollFraction =
+          maxScroll > 0
+            ? Math.min(1, Math.max(0, window.scrollY / maxScroll))
+            : 0;
+        if (leftSidebar && leftSidebar.scrollHeight > leftSidebar.clientHeight)
+          leftSidebar.scrollTop =
+            scrollFraction *
+            (leftSidebar.scrollHeight - leftSidebar.clientHeight);
+        if (
+          rightSidebar &&
+          rightSidebar.scrollHeight > rightSidebar.clientHeight
+        )
+          rightSidebar.scrollTop =
+            scrollFraction *
+            (rightSidebar.scrollHeight - rightSidebar.clientHeight);
       }
     };
-
   } catch (e) {
-    shell(`<section class="wrap page-head">${empty(e.message, "Back home", "/")}</section>`);
+    shell(
+      `<section class="wrap page-head">${empty(e.message, "Back home", "/")}</section>`,
+    );
   }
 }
 
@@ -1327,7 +1485,7 @@ async function composer(id) {
     tags: $("[name=tags]"),
   };
   const inlineFile = $("#inline-file");
-    const previewDiv = $("#editor-preview");
+  const previewDiv = $("#editor-preview");
   const previewContent = $("#preview-content");
   const textarea = $("[name=content]");
   let previewMode = false;
@@ -1338,7 +1496,9 @@ async function composer(id) {
       textarea.style.display = "none";
       previewDiv.style.display = "block";
       // Render the markdown into the article-content container
-      previewContent.innerHTML = markdown(textarea.value) || "<p style='color:var(--muted)'>Nothing to preview yet…</p>";
+      previewContent.innerHTML =
+        markdown(textarea.value) ||
+        "<p style='color:var(--muted)'>Nothing to preview yet…</p>";
       $("#toggle-preview").textContent = "Edit";
     } else {
       textarea.style.display = "block";
@@ -1347,8 +1507,8 @@ async function composer(id) {
     }
   });
 
-  textarea.addEventListener("input", () => { 
-    if (previewMode) previewContent.innerHTML = markdown(textarea.value); 
+  textarea.addEventListener("input", () => {
+    if (previewMode) previewContent.innerHTML = markdown(textarea.value);
   });
 
   function wrapSelection(before, after = before) {

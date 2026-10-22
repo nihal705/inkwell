@@ -2190,17 +2190,21 @@ mark.inkwell-highlight:hover {
 }
 
 /* === MOBILE POST PAGE LAYOUT === */
+@media (min-width: 801px) {
+  .mobile-only { 
+    display: none !important; 
+  }
+}
+
+/* Mobile Specific Fixes */
 @media (max-width: 800px) {
-  /* 1. Visibility Rules */
+  /* Hide desktop sidebars on mobile */
   .sidebar-left, 
   .desktop-only { 
     display: none !important; 
   }
-  .mobile-only { 
-    display: block !important; 
-  }
 
-  /* 2. TOOLS ROW (Single Block) */
+  /* 1. TOOLS ROW (Above Title) */
   .mobile-tools-row {
     display: flex !important;
     flex-direction: row !important;
@@ -2248,7 +2252,12 @@ mark.inkwell-highlight:hover {
     border-radius: 8px !important;
   }
 
-  /* 3. SHARE ROW (Single Block) */
+  /* Hide TTS button on mobile */
+  .mobile-tools-row .tts-toggle {
+    display: none !important;
+  }
+
+  /* 2. SHARE ROW (Below Author) */
   .mobile-share-row {
     display: flex !important;
     align-items: center;
@@ -2282,13 +2291,13 @@ mark.inkwell-highlight:hover {
     margin-bottom: 0 !important;
   }
 
-  /* 4. Spacing Fixes */
+  /* 3. Spacing Fixes */
   .article-content { padding-bottom: 20px !important; }
   .sidebar-right { margin-top: 10px !important; padding-top: 0 !important; }
   .sidebar-right .side-block:first-child { margin-top: 0 !important; }
 }
 
-/* 5. Dark Mode Fix for Desktop Tools */
+/* 4. Dark Mode Fix for Desktop Tools */
 .focus-btn {
   background: var(--paper) !important;
   color: var(--ink) !important;
