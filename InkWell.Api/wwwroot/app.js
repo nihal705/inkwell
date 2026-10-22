@@ -1192,7 +1192,7 @@ async function postPage(id) {
         ? others
             .map(
               (r) =>
-                `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
+                `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.displayName || r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
             )
             .join("")
         : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
@@ -1695,7 +1695,7 @@ async function admin() {
         ? posts
             .map(
               (p) =>
-                `<article class="review"><div><div class="eyebrow">${esc(p.author.username)} · ${date(p.createdAt)}</div><h2>${esc(p.title)}</h2><p>${esc(p.excerpt)}</p><button class="link-button danger-link delete-post" data-id="${p.id}" style="color:var(--danger)">Delete</button></div><div class="review-actions"><button class="button approve" data-id="${p.id}">Approve</button><button class="button danger reject-post" data-id="${p.id}">Return</button></div></article>`,
+                `<article class="review"><div><div class="eyebrow">${esc(p.author.displayName || p.author.username)} · ${date(p.createdAt)}</div><h2>${esc(p.title)}</h2><p>${esc(p.excerpt)}</p><button class="link-button danger-link delete-post" data-id="${p.id}" style="color:var(--danger)">Delete</button></div><div class="review-actions"><button class="button approve" data-id="${p.id}">Approve</button><button class="button danger reject-post" data-id="${p.id}">Return</button></div></article>`,
             )
             .join("")
         : empty("Nothing waiting.", "Home", "/");
@@ -1811,7 +1811,7 @@ function searchModal() {
         ? d.items
             .map(
               (p) =>
-                `<a href="/post/${p.id}" class="search-item">${esc(p.title)}<small>${esc(p.author.username)}</small></a>`,
+                `<a href="/post/${p.id}" class="search-item">${esc(p.title)}<small>${esc(p.author.displayName || p.author.username)}</small></a>`,
             )
             .join("")
         : "No results.";
