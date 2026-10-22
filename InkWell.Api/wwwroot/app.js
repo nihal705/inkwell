@@ -764,17 +764,28 @@ async function postPage(id) {
     if (window.innerWidth <= 800) {
       const tools = $("#sidebar-tools");
       const share = $("#sidebar-share");
-      const content = $("#article-content");
+      const articleBody = $(".article-body");
+      const articleContent = $("#article-content");
+      const articleHead = $(".article-head"); // Target the title area
+      
+      // Find the TOC block inside the right sidebar to hide it
+      const tocBlock = $(".sidebar-right .side-block:has(.toc)");
 
-      // 1. Move Share after Author Bio
-      if (share && content) {
-        content.appendChild(share);
-        share.style.marginTop = '40px'; 
+      // 1. Move Tools to the VERY TOP (above the title)
+      if (tools && articleBody && articleHead) {
+        articleBody.insertBefore(tools, articleHead); 
+        tools.classList.add("mobile-tools-row");
       }
-      // 2. Move Tools right below Share
-      if (tools && content) {
-        content.appendChild(tools);
-        tools.style.marginTop = '16px';
+
+      // 2. Move Share to the BOTTOM (inside article content, after author bio)
+      if (share && articleContent) {
+        articleContent.appendChild(share);
+        share.classList.add("mobile-share-row");
+      }
+
+      // 3. Hide "On this page" (TOC) on mobile
+      if (tocBlock) {
+        tocBlock.style.display = 'none';
       }
     }
 
