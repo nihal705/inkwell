@@ -45,6 +45,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddCors(options => options.AddPolicy("AllowFrontend", policy => policy
     .SetIsOriginAllowed(origin => origin == "http://localhost:5000" || origin == "http://localhost:5173" || new Uri(origin).Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
     .AllowAnyHeader().AllowAnyMethod()));
+builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 

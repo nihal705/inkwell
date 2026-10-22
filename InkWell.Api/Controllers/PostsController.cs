@@ -4,6 +4,9 @@ using InkWell.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Text;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace InkWell.Api.Controllers;
 
@@ -53,6 +56,73 @@ public class PostsController(AppDbContext db) : ControllerBase
             .Where(x => x.AuthorId == id || User.IsInRole("Admin"))
             .OrderByDescending(x => x.UpdatedAt).ToListAsync();
         return Ok(posts.Select(x => ApiMapper.Post(x, true)));
+    }
+
+    // ============================================
+    // AI SUMMARY (GROQ)
+    // ============================================
+    [AllowAnonymous, HttpPost("{id:int}/summarize")]
+    public async Task<IActionResult> Summarize(int id, [FromServices] IHttpClientFactory httpClientFactory)
+    {
+        var post = await db.Posts.FindAsync(id);
+        if (post == null) return NotFound(new { message = "Post not found." });
+
+        // 1. Strip Markdown so we don't send #, *, or links to the AI
+        var cleanText = Regex.Replace(post.Content, @"!\[.*?\]\(.*?\)|\[([^\]]+)\]\([^)]+\)|^#+\s+.*$|^\s*[-*+]\s+|[#*_>`]", "", RegexOptions.Multiline);
+        cleanText = Regex.Replace(cleanText, @"\s+", " ").Trim();
+
+        // Limit text length to avoid exceeding token limits (approx 4000 words)
+        if (cleanText.Length > 16000) cleanText = cleanText.Substring(0, 16000);
+
+        var apiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return StatusCode(500, new { message = "Groq API key is missing." });
+
+        var client = httpClientFactory.CreateClient();
+
+        // 2. Build the request for Groq (OpenAI-compatible format)
+        var requestBody = new
+        {
+            model = "openai/gpt-oss-20b",
+            messages = new[]
+            {
+                new { role = "system", content = "You are an expert editor. Summarize the following article in 2 to 3 sentences. Make it engaging, smooth, and professional. Do not use introductory phrases like 'This article is about'. Just give the summary." },
+                new { role = "user", content = cleanText }
+            },
+            temperature = 0.5,
+            max_tokens = 150
+        };
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+        request.Headers.Add("Authorization", $"Bearer {apiKey}");
+        request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+
+        try
+        {
+            var response = await client.SendAsync(request);
+            var responseString = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Console.WriteLine($"Groq Error: {responseString}");
+                return StatusCode(500, new { message = "Failed to generate summary from Groq." });
+            }
+
+            // 3. Parse the response
+            using var jsonDoc = JsonDocument.Parse(responseString);
+            var summary = jsonDoc.RootElement
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString();
+
+            return Ok(new { summary = summary?.Trim() });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Summary Exception: {ex.Message}");
+            return StatusCode(500, new { message = "An error occurred while generating the summary." });
+        }
     }
 
     [Authorize(Roles = "Editor,Admin"), HttpGet("mine/{id:int}")]
@@ -178,6 +248,46 @@ public class PostsController(AppDbContext db) : ControllerBase
                 ?? new Tag { Name = trimmed, Slug = slug };
             p.PostTags.Add(new PostTag { Tag = tag });
         }
+    }
+
+        // GET: /api/posts/random
+    [AllowAnonymous, HttpGet("random")]
+    public async Task<IActionResult> GetRandom()
+    {
+        var count = await db.Posts.CountAsync(x => x.Status == "Published");
+        if (count == 0) return NotFound();
+        var skip = new Random().Next(0, count);
+        var post = await WithDetails().Where(x => x.Status == "Published").Skip(skip).FirstOrDefaultAsync();
+        return Ok(new { id = post?.Id });
+    }
+
+    // GET: /api/posts/daily-quote
+    [AllowAnonymous, HttpGet("daily-quote")]
+    public async Task<IActionResult> GetDailyQuote()
+    {
+        var posts = await WithDetails().Where(x => x.Status == "Published").ToListAsync();
+        if (!posts.Any()) return Ok(new { quote = "Start writing your first story today.", author = "InkWell", postTitle = "", postId = 0 });
+
+        // Use the current day of the year as a seed to ensure it changes daily
+        var dayOfYear = DateTime.UtcNow.DayOfYear;
+        var post = posts[dayOfYear % posts.Count];
+
+        // Extract a good sentence from the post content
+        var sentences = post.Content.Split(new[] { ". ", "? ", "! " }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => s.Trim())
+            .Where(s => s.Length > 50 && s.Length < 200)
+            .ToList();
+
+        var quote = sentences.Any() ? sentences[0] : post.Title;
+        if (!quote.EndsWith(".") && !quote.EndsWith("?") && !quote.EndsWith("!")) quote += ".";
+
+        return Ok(new
+        {
+            quote = quote,
+            author = post.Author.DisplayName ?? post.Author.Username,
+            postTitle = post.Title,
+            postId = post.Id
+        });
     }
 
     void SetImages(Post p, PostCreateDto dto)
