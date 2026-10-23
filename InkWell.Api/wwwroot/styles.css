@@ -681,9 +681,42 @@ textarea {
   border-radius: 6px;
 }
 .status {
-  font-size: 12px;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--soft);
   color: var(--muted);
-  font-weight: 600;
+}
+.status.status-admin {
+  background: rgba(194, 65, 12, 0.12);
+  color: #c2410c;
+  border: 1px solid rgba(194, 65, 12, 0.3);
+}
+.status.status-featured-columnist,
+.status.status-senior-editor {
+  background: rgba(109, 40, 217, 0.12);
+  color: #7c3aed;
+  border: 1px solid rgba(109, 40, 217, 0.25);
+}
+.status.status-staff-editor,
+.status.status-editor {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+  border: 1px solid rgba(13, 148, 136, 0.25);
+}
+.status.status-contributing-writer {
+  background: rgba(217, 119, 6, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+.status.status-reader {
+  background: var(--soft);
+  color: var(--muted);
+  border: 1px solid var(--line);
 }
 .status.pending,
 .status.pendingreview {

@@ -137,6 +137,32 @@ const slugify = (text) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+const getEditorialRole = (u, context = "editorial") => {
+  if (!u) return "Reader";
+  const role = (u.role || "").toLowerCase();
+  const bio = (u.bio || "").toLowerCase();
+  const isMainAdmin = role === "admin" || u.username === "editorial_admin" || u.id === 1 || (u.displayName === "G Nihal" && role === "admin") || bio.includes("founder");
+
+  if (isMainAdmin) {
+    if (context === "publisher" || context === "community" || context === "admin") {
+      return "Founder & Publisher";
+    }
+    if (context === "both") {
+      return "Founder & Publisher · Editor-in-Chief";
+    }
+    return "Founder & Editor-in-Chief";
+  }
+  if (role === "featured columnist" || role === "senior editor") return "Featured Columnist";
+  if (role === "contributing writer" || role === "staff editor" || role === "editor" || role === "writer") return "Contributing Writer";
+  return u.role || "Reader";
+};
+
+const canWrite = (u) => {
+  if (!u) return false;
+  const r = (u.role || "").toLowerCase();
+  return r === "admin" || r === "featured columnist" || r === "contributing writer" || r === "senior editor" || r === "staff editor" || r === "editor" || r === "writer";
+};
+
 function toast(message, type = "") {
   const t = $("#toast");
   t.textContent = message;
@@ -369,6 +395,8 @@ function shell(content) {
           ${
             u
               ? `
+            ${u.role === "Admin" ? `<a class="button small secondary" href="/admin" style="margin-right:6px;">Admin Desk</a>` : ""}
+            ${canWrite(u) ? `<a class="button small" href="/editor/new" style="margin-right:6px;">Write</a>` : `<a class="button small secondary" href="/apply" style="margin-right:6px;">Apply to Write</a>`}
             <a class="avatar" href="/profile" title="Profile">${u.profilePictureUrl ? `<img src="${esc(u.profilePictureUrl)}" alt="">` : initials(u)}</a>
             <button class="link-button" id="logout">Log out</button>
           `
@@ -385,7 +413,7 @@ function shell(content) {
       <div class="wrap footer-grid">
         <div><a class="brand" href="/">Ink<span>Well</span></a><p>Where readers become writers.</p></div>
         <div><b>Explore</b><a href="/">Latest articles</a><a href="/articles">Catalog</a><a href="/series">Series</a><a href="/categories">Categories</a><a href="/library">Saved</a></div>
-        <div><b>Write</b>${u ? `<a href="/editor/new">New article</a><a href="/editor">Dashboard</a>` : `<a href="/register">Start writing</a>`}</div>
+        <div><b>Write</b>${u ? (canWrite(u) ? `<a href="/editor/new">New article</a><a href="/editor">Dashboard</a>` : `<a href="/apply">Apply to Write</a>`) : `<a href="/register">Start writing</a>`}</div>
         <div><b>Legal</b><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/contact">Contact</a></div>
       </div>
       <div class="wrap fineprint">© ${new Date().getFullYear()} InkWell. Made for considered writing.</div>
@@ -805,10 +833,10 @@ async function seriesDetailPage(slug) {
             </div>
 
             <div class="series-hero-meta">
-              <span class="mini-avatar">${avatarImg(s.author)}</span>
+              <a href="/author/${s.author?.id}" class="mini-avatar" style="text-decoration:none;">${avatarImg(s.author)}</a>
               <div>
-                <b>${esc(s.author?.displayName || s.author?.username)}</b>
-                <small style="display:block;color:var(--muted);">${esc(s.author?.profession || "Writer & Editor")}</small>
+                <a href="/author/${s.author?.id}" style="font-weight:700;color:var(--ink);">${esc(s.author?.displayName || s.author?.username)}</a>
+                <small style="display:block;color:var(--accent);font-weight:600;">${getEditorialRole(s.author)}</small>
               </div>
             </div>
 
@@ -1572,34 +1600,151 @@ function authPage(mode) {
     <section class="auth-form"><div>
       <div class="eyebrow">${login ? "Welcome back" : "Join the conversation"}</div>
       <h1>${login ? "Sign in to InkWell" : "Create your writer account"}</h1>
+      <p id="auth-subtitle" style="color:var(--muted);margin-bottom:18px;">${login ? "Enter your email and password to access your desk." : "Every member starts as a Reader. Enter your details to verify your email."}</p>
+      
       <form id="auth">
-        ${login ? "" : `<label>Username<input name="username" autocomplete="username" placeholder="G Nihal" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._\- ]{3,40}"><small>Letters, numbers, spaces, dots, hyphens, underscores. 3–40 characters.</small></label>`}
-        <label>Email<input type="email" name="email" autocomplete="email" placeholder="you@example.com" required></label>
-        <label>Password<input type="password" name="password" autocomplete="${login ? "current-password" : "new-password"}" placeholder="••••••••" required></label>
-        <button class="button" type="submit">${login ? "Sign in →" : "Create account →"}</button>
+        ${login ? "" : `<label>Username<input name="username" id="auth-username" autocomplete="username" placeholder="G Nihal" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._\\- ]{3,40}"><small>Letters, numbers, spaces, dots, hyphens, underscores. 3–40 characters.</small></label>`}
+        <label>Email<input type="email" name="email" id="auth-email" autocomplete="email" placeholder="you@example.com" required></label>
+        <label>Password<input type="password" name="password" id="auth-password" autocomplete="${login ? "current-password" : "new-password"}" placeholder="••••••••" required minlength="8"><small>${login ? "" : "At least 8 characters with a letter and a number."}</small></label>
+
+        ${login ? "" : `
+          <div id="reg-otp-container" style="display:none;margin-top:14px;">
+            <div id="reg-spam-note" style="margin:0 0 14px 0;padding:11px 14px;background:#fff8e1;border-left:3px solid #d4a72c;border-radius:6px;font-size:13px;line-height:1.5;color:#6b655b;">
+              We sent a 6-digit verification code to your email. Can't find it? Check your <b>spam</b> folder.
+            </div>
+            <label>6-Digit Verification Code
+              <input type="text" name="otpCode" id="reg-otp-code" placeholder="123456" maxlength="6" pattern="\\d{6}" autocomplete="one-time-code" inputmode="numeric">
+              <small>Enter the code sent to your inbox.</small>
+            </label>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;margin-bottom:12px;">
+              <small style="color:var(--muted);">Code valid for 10 minutes</small>
+              <button type="button" id="reg-resend-btn" class="link-button" style="font-size:0.82rem;color:var(--accent);">Resend code</button>
+            </div>
+          </div>
+        `}
+
+        <button class="button" type="submit" id="auth-submit-btn">${login ? "Sign in →" : "Send verification code →"}</button>
       </form>
+
       ${login ? '<p class="form-foot" style="margin-top:10px"><a href="/forgot-password">Forgot password?</a></p>' : ""}
       <p class="form-foot">${login ? 'New here? <a href="/register">Create an account</a>' : 'Already a member? <a href="/login">Sign in</a>'}</p>
     </div></section>
   </section>`);
-  $("#auth").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const b = $("button", e.target);
-    b.disabled = true;
-    b.textContent = "Just a moment…";
+
+  let otpSent = false;
+  let resendCooldown = 0;
+  let cooldownTimer = null;
+
+  const startCooldown = () => {
+    resendCooldown = 60;
+    const resendBtn = $("#reg-resend-btn");
+    if (!resendBtn) return;
+    resendBtn.disabled = true;
+    resendBtn.textContent = `Resend in ${resendCooldown}s`;
+    clearInterval(cooldownTimer);
+    cooldownTimer = setInterval(() => {
+      resendCooldown--;
+      if (resendCooldown <= 0) {
+        clearInterval(cooldownTimer);
+        resendBtn.disabled = false;
+        resendBtn.textContent = "Resend code";
+      } else {
+        resendBtn.textContent = `Resend in ${resendCooldown}s`;
+      }
+    }, 1000);
+  };
+
+  $("#reg-resend-btn")?.addEventListener("click", async () => {
+    if (resendCooldown > 0) return;
+    const email = $("#auth-email").value.trim();
+    const username = $("#auth-username")?.value.trim() || "";
+    if (!email || !username) {
+      toast("Please enter your username and email first.", "error");
+      return;
+    }
     try {
-      setSession(
-        await api(`/api/auth/${login ? "login" : "register"}`, {
-          method: "POST",
-          body: JSON.stringify(Object.fromEntries(new FormData(e.target))),
-        }),
-      );
-      toast("Success");
-      navigate("/editor");
+      toast("Resending verification code...");
+      await api("/api/auth/register/request-otp", {
+        method: "POST",
+        body: JSON.stringify({ email, username }),
+      });
+      toast("New verification code sent!");
+      startCooldown();
     } catch (err) {
       toast(err.message, "error");
-      b.disabled = false;
-      b.textContent = login ? "Sign in →" : "Create account →";
+    }
+  });
+
+  $("#auth").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn = $("#auth-submit-btn");
+    const formData = Object.fromEntries(new FormData(e.target));
+
+    if (login) {
+      btn.disabled = true;
+      btn.textContent = "Signing in…";
+      try {
+        const res = await api("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify(formData),
+        });
+        setSession(res);
+        toast("Welcome back, " + (res.user.displayName || res.user.username));
+        navigate(canWrite(res.user) ? "/editor" : "/");
+      } catch (err) {
+        toast(err.message, "error");
+        btn.disabled = false;
+        btn.textContent = "Sign in →";
+      }
+      return;
+    }
+
+    // REGISTRATION WITH EMAIL OTP
+    if (!otpSent) {
+      btn.disabled = true;
+      btn.textContent = "Sending code…";
+      try {
+        await api("/api/auth/register/request-otp", {
+          method: "POST",
+          body: JSON.stringify({
+            username: formData.username,
+            email: formData.email,
+          }),
+        });
+        otpSent = true;
+        toast("Verification code sent! Please check your email.");
+        $("#reg-otp-container").style.display = "block";
+        $("#reg-otp-code").required = true;
+        $("#reg-otp-code").focus();
+        btn.disabled = false;
+        btn.textContent = "Verify & Create Account →";
+        startCooldown();
+      } catch (err) {
+        toast(err.message, "error");
+        btn.disabled = false;
+        btn.textContent = "Send verification code →";
+      }
+    } else {
+      if (!formData.otpCode || formData.otpCode.length !== 6) {
+        toast("Please enter the 6-digit verification code.", "error");
+        $("#reg-otp-code").focus();
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Verifying & creating account…";
+      try {
+        const res = await api("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify(formData),
+        });
+        setSession(res);
+        toast("Email verified! Welcome to InkWell, " + (res.user.displayName || res.user.username));
+        navigate("/");
+      } catch (err) {
+        toast(err.message, "error");
+        btn.disabled = false;
+        btn.textContent = "Verify & Create Account →";
+      }
     }
   });
 }
@@ -1682,10 +1827,85 @@ function forgotPasswordPage() {
 
 async function apply() {
   if (!state.user) {
-    navigate("/register");
+    navigate("/login");
     return;
   }
-  navigate("/editor");
+  updateMeta("Apply for an Editorial Position — InkWell", "Join the InkWell writing staff.");
+  shell(`<div class="article-skeleton wrap"></div>`);
+  try {
+    const apps = await api("/api/editor-applications/mine").catch(() => []);
+    const pendingApp = apps.find(a => a.status === "Pending");
+
+    shell(`
+      <section class="wrap narrow page-head" style="padding-top:40px;padding-bottom:20px;">
+        <div class="eyebrow">Editorial Masthead</div>
+        <h1>Apply for an Editorial Position</h1>
+        <p>InkWell is an editorial publication built on deep curiosity, high standards, and craft. Apply to join our writing staff or request promotion to an advanced desk.</p>
+        
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:24px 0;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <small style="color:var(--muted);text-transform:uppercase;font-size:0.75rem;font-weight:700;">Your Current Standing</small>
+            <div style="font-weight:700;font-size:1.1rem;color:var(--ink);">${getEditorialRole(state.user)}</div>
+          </div>
+          <span class="status status-${(state.user.role || '').toLowerCase().replace(' ', '-')}">${state.user.role || 'Reader'}</span>
+        </div>
+      </section>
+
+      <section class="wrap narrow" style="margin-bottom:60px;">
+        ${pendingApp ? `
+          <div style="background:var(--soft);border:1px solid var(--accent);border-radius:12px;padding:28px;text-align:center;">
+            <div style="font-size:2rem;margin-bottom:8px;">⏳</div>
+            <h3 style="margin:0 0 8px;">Application Under Review</h3>
+            <p style="color:var(--ink);margin:0 0 10px;">
+              You applied for promotion to <b>${esc(pendingApp.requestedRole)}</b> on ${date(pendingApp.appliedAt)}.
+            </p>
+            <p style="color:var(--muted);font-size:0.9rem;margin:0;">
+              The Founder & Editor-in-Chief is reviewing your writing pitch and portfolio. You will be updated as soon as an editorial decision is reached.
+            </p>
+          </div>
+        ` : `
+          <form id="apply-form" style="background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px;display:flex;flex-direction:column;gap:18px;">
+            <div>
+              <label style="font-weight:600;display:block;margin-bottom:6px;">Select Desired Position (Lowest to Highest)</label>
+              <select name="requestedRole" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-size:0.95rem;color:var(--ink);">
+                <option value="Contributing Writer">Level 2: Contributing Writer — Publish articles & essays on InkWell</option>
+                <option value="Featured Columnist">Level 3: Featured Columnist — Prolific long-form & series writer</option>
+              </select>
+            </div>
+
+            <div>
+              <label style="font-weight:600;display:block;margin-bottom:6px;">Your Writing Background & Motivation</label>
+              <textarea name="motivation" rows="6" placeholder="Tell us about the topics you explore (urban planning, technology, culture, design), your writing experience, or links to published pieces..." style="width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-size:0.95rem;line-height:1.5;color:var(--ink);"></textarea>
+            </div>
+
+            <button type="submit" class="button" style="align-self:flex-start;">Submit Application →</button>
+          </form>
+        `}
+      </section>
+    `);
+
+    $("#apply-form")?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const requestedRole = $("[name=requestedRole]", e.target).value;
+      const motivation = $("[name=motivation]", e.target).value.trim();
+      if (!motivation || motivation.length < 20) {
+        toast("Please provide at least a couple of sentences explaining your writing background.", "error");
+        return;
+      }
+      try {
+        await api("/api/editor-applications", {
+          method: "POST",
+          body: JSON.stringify({ requestedRole, motivation })
+        });
+        toast("Application submitted successfully!");
+        apply();
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    });
+  } catch (err) {
+    shell(`<section class="wrap page-head">${empty("Could not load application.", "Back home", "/")}</section>`);
+  }
 }
 
 function profile() {
@@ -1744,25 +1964,92 @@ function profile() {
 }
 
 async function author(id) {
-  updateMeta("Author Profile — InkWell", "Read articles by this author.");
-  shell(
-    `<section class="wrap page-head" id="author"></section><section class="wrap post-grid" id="posts"></section>`,
-  );
-  const d = await api(`/api/authors/${id}`);
-  const u = d.author;
-  const name = u.displayName || u.username;
-  const meta = [u.profession, u.studies, u.location]
-    .filter(Boolean)
-    .join(" · ");
-  $("#author").innerHTML =
-    `<span class="mini-avatar large">${avatarImg(u)}</span><div class="eyebrow">Contributor</div><h1>${esc(name)}</h1>${meta ? `<p class="author-meta">${esc(meta)}</p>` : ""}<p>${esc(u.bio || "Writer.")}</p>`;
-  $("#posts").innerHTML =
-    d.posts.map(card).join("") || empty("No articles.", "Home", "/");
+  shell(`<div class="article-skeleton wrap"></div>`);
+  try {
+    const d = await api(`/api/authors/${id}`);
+    const u = d.author;
+    const name = u.displayName || u.username;
+    const roleTitle = getEditorialRole(u, "both");
+    updateMeta(`${name} (${roleTitle}) — InkWell`, u.bio || `Read articles and series by ${name} on InkWell.`);
+
+    const meta = [u.profession, u.studies, u.location]
+      .filter(Boolean)
+      .join(" · ");
+
+    const seriesHtml = d.series && d.series.length > 0 ? `
+      <section class="wrap" style="margin-bottom: 48px;">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">Anthologies & Investigations</div>
+            <h2>Series by ${esc(name)}</h2>
+          </div>
+        </div>
+        <div class="series-grid">
+          ${d.series.map((s) => `
+            <a class="series-card fade-in-up" href="/series/${esc(s.slug)}">
+              <div class="series-card-cover">
+                <span class="series-chapter-badge">${s.partsCount} ${s.partsCount === 1 ? 'Chapter' : 'Chapters'}</span>
+                ${s.coverImageUrl ? `<img loading="lazy" src="${esc(s.coverImageUrl)}" alt="${esc(s.title)}">` : `<div style="width:100%;height:100%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:var(--accent);">✦</div>`}
+              </div>
+              <div class="series-card-body">
+                <div style="font-size:0.8rem;color:var(--muted);margin-bottom:6px;">
+                  By ${esc(name)} · ${s.partsCount} ${s.partsCount === 1 ? 'Part' : 'Parts'} · ${s.totalReadingTimeMinutes} min total read
+                </div>
+                <h3 class="series-card-title">${esc(s.title)}</h3>
+                <p class="series-card-desc">${esc(s.description || "")}</p>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.82rem;font-weight:600;color:var(--accent);">
+                  <span>Explore Series</span>
+                  <span>→</span>
+                </div>
+              </div>
+            </a>
+          `).join("")}
+        </div>
+      </section>
+    ` : "";
+
+    shell(`
+      <section class="wrap page-head" id="author">
+        <span class="mini-avatar large">${avatarImg(u)}</span>
+        <div class="eyebrow">${roleTitle}</div>
+        <h1>${esc(name)}</h1>
+        ${meta ? `<p class="author-meta">${esc(meta)}</p>` : ""}
+        <p>${esc(u.bio || "Contributing writer at InkWell.")}</p>
+        ${u.website || u.linkedInUrl || u.twitterHandle ? `
+          <div style="display:flex;gap:14px;margin-top:12px;font-size:13px;font-weight:600;">
+            ${u.website ? `<a href="${esc(u.website)}" target="_blank" rel="noopener" style="color:var(--accent);">Website ↗</a>` : ""}
+            ${u.linkedInUrl ? `<a href="${esc(u.linkedInUrl)}" target="_blank" rel="noopener" style="color:var(--accent);">LinkedIn ↗</a>` : ""}
+            ${u.twitterHandle ? `<a href="https://twitter.com/${esc(u.twitterHandle.replace('@',''))}" target="_blank" rel="noopener" style="color:var(--accent);">X ↗</a>` : ""}
+          </div>
+        ` : ""}
+      </section>
+
+      ${seriesHtml}
+
+      <section class="wrap">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow">Public Library</div>
+            <h2>Articles by ${esc(name)}</h2>
+          </div>
+        </div>
+        <div class="post-grid" id="posts">
+          ${d.posts && d.posts.length ? d.posts.map(card).join("") : empty("No articles published yet.", "Explore library", "/")}
+        </div>
+      </section>
+    `);
+  } catch (err) {
+    shell(`<section class="wrap page-head">${empty("Author profile not found.", "Back home", "/")}</section>`);
+  }
 }
 
 // ==================== EDITOR & ADMIN ====================
 async function editor() {
-  if (!guard(["Editor", "Admin"])) return;
+  if (!guard(["Admin", "Senior Editor", "Staff Editor", "Contributing Writer", "Editor"])) {
+    toast("Apply to join our writing staff to access the editorial desk.");
+    navigate("/apply");
+    return;
+  }
   updateMeta("Dashboard — InkWell", "Your writing desk.");
   shell(
     `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Your writing desk</div><h1>Hello, ${esc(state.user.displayName || state.user.username)}.</h1></div><a class="button" href="/editor/new">New article +</a></div><div class="stats" id="editor-stats"></div><div class="table-wrap"><div class="section-heading"><h2>Your articles</h2></div><div id="my-posts"></div></div></section>`,
@@ -1796,7 +2083,11 @@ async function editor() {
 }
 
 async function composer(id) {
-  if (!guard(["Editor", "Admin"])) return;
+  if (!guard(["Admin", "Senior Editor", "Staff Editor", "Contributing Writer", "Editor"])) {
+    toast("Apply to join our writing staff to compose articles.");
+    navigate("/apply");
+    return;
+  }
   updateMeta("Write an Article — InkWell", "Compose your next story.");
   const [post, seriesList] = await Promise.all([
     id
@@ -1849,12 +2140,33 @@ async function composer(id) {
           <h2>Story details</h2>
           <label>Cover image <span style="color:var(--danger)">*</span><input type="file" accept="image/*" id="cover-file"><input type="hidden" name="image" value="${esc(curImg)}"></label>
           <div class="image-preview" id="cover-preview">${curImg ? `<img src="${esc(curImg)}" alt="">` : "<span>No cover</span>"}</div>
-          <label>Part of a Series? (Optional)
-            <select name="seriesId">
-              <option value="">None (Standalone Article)</option>
-              ${seriesList.map((s) => `<option value="${s.id}" ${post.seriesId === s.id ? 'selected' : ''}>${esc(s.title)}</option>`).join("")}
-            </select>
-          </label>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:6px;">
+            <label style="margin:0;font-size:14px;font-weight:600;">Part of a Series? (Optional)</label>
+            <button type="button" class="link-button" id="btn-quick-new-series" style="color:var(--accent);font-size:12px;font-weight:700;">+ New Series</button>
+          </div>
+          <select name="seriesId" id="series-select" style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);margin-bottom:10px;">
+            <option value="">None (Standalone Article)</option>
+            ${seriesList.map((s) => `<option value="${s.id}" ${post.seriesId === s.id ? 'selected' : ''}>${esc(s.title)}</option>`).join("")}
+          </select>
+
+          <!-- INLINE QUICK CREATE SERIES FORM -->
+          <div id="quick-series-form" style="display:none;background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:14px;margin-bottom:14px;">
+            <b style="font-size:13px;display:block;margin-bottom:8px;color:var(--accent);">Create New Multi-Part Series</b>
+            <label style="font-size:12px;">Series Title <span style="color:var(--danger)">*</span>
+              <input type="text" id="quick-series-title" placeholder="e.g., Bengaluru's Transit Revolution" style="padding:6px 8px;font-size:13px;margin-bottom:8px;">
+            </label>
+            <label style="font-size:12px;">Premise / Description
+              <textarea id="quick-series-desc" rows="2" placeholder="Brief synopsis of this series..." style="padding:6px 8px;font-size:12px;margin-bottom:8px;"></textarea>
+            </label>
+            <label style="font-size:12px;">Series Cover Image (Optional)
+              <input type="file" accept="image/*" id="quick-series-file" style="font-size:12px;margin-bottom:10px;">
+            </label>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="button small" id="quick-series-submit-btn" style="padding:6px 12px;font-size:12px;">Create & Link</button>
+              <button type="button" class="button small secondary" id="quick-series-cancel-btn" style="padding:6px 12px;font-size:12px;">Cancel</button>
+            </div>
+          </div>
+
           <div id="series-order-wrap" style="${post.seriesId ? '' : 'display:none;'}">
             <label>Series Chapter Number
               <input type="number" min="1" max="100" name="seriesOrder" value="${post.seriesOrder || 1}">
@@ -1946,6 +2258,73 @@ async function composer(id) {
   fields.seriesId?.addEventListener("change", (e) => {
     const wrap = $("#series-order-wrap");
     if (wrap) wrap.style.display = e.target.value ? "block" : "none";
+  });
+
+  // Quick Inline Series Creation within Composer
+  $("#btn-quick-new-series")?.addEventListener("click", () => {
+    const form = $("#quick-series-form");
+    if (form) {
+      form.style.display = form.style.display === "none" ? "block" : "none";
+      if (form.style.display === "block") $("#quick-series-title")?.focus();
+    }
+  });
+
+  $("#quick-series-cancel-btn")?.addEventListener("click", () => {
+    const form = $("#quick-series-form");
+    if (form) form.style.display = "none";
+  });
+
+  $("#quick-series-submit-btn")?.addEventListener("click", async () => {
+    const title = $("#quick-series-title")?.value.trim();
+    const desc = $("#quick-series-desc")?.value.trim();
+    const file = $("#quick-series-file")?.files?.[0];
+
+    if (!title) {
+      toast("Series title is required", "error");
+      return;
+    }
+
+    const submitBtn = $("#quick-series-submit-btn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating...";
+
+    try {
+      let coverUrl = null;
+      if (file) {
+        toast("Uploading series cover...");
+        coverUrl = await uploadImage(file);
+      }
+
+      const res = await api("/api/series", {
+        method: "POST",
+        body: JSON.stringify({
+          title,
+          description: desc,
+          coverImageUrl: coverUrl,
+        }),
+      });
+
+      const newSeries = res.series;
+      const select = $("[name=seriesId]");
+      const opt = document.createElement("option");
+      opt.value = newSeries.id;
+      opt.textContent = newSeries.title;
+      opt.selected = true;
+      select.appendChild(opt);
+
+      const orderWrap = $("#series-order-wrap");
+      if (orderWrap) orderWrap.style.display = "block";
+      const orderInput = $("[name=seriesOrder]");
+      if (orderInput && (!orderInput.value || orderInput.value === "0")) orderInput.value = "1";
+
+      $("#quick-series-form").style.display = "none";
+      toast(`Series "${newSeries.title}" created & linked!`);
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Create & Link";
+    }
   });
 
   inlineFile?.addEventListener("change", async (e) => {
@@ -2322,18 +2701,164 @@ async function admin() {
         out.innerHTML = empty("Failed to load series catalog.", "Retry", "/admin");
       }
     } else if (t === "applications") {
-      out.innerHTML = applications.filter((a) => a.status === "Pending").length
-        ? applications
-            .filter((a) => a.status === "Pending")
-            .map(
-              (a) =>
-                `<article class="review"><div><h2>${esc(a.applicant.username)}</h2><p>${esc(a.motivation)}</p></div><div class="review-actions"><button class="button approve-app" data-id="${a.id}">Approve</button><button class="button danger reject-app" data-id="${a.id}">Decline</button></div></article>`,
-            )
-            .join("")
-        : empty("No applications.", "Home", "/");
+      const pending = applications.filter((a) => a.status === "Pending");
+      const past = applications.filter((a) => a.status !== "Pending");
+
+      if (applications.length === 0) {
+        out.innerHTML = empty("No promotion applications submitted yet.", "Home", "/");
+      } else {
+        out.innerHTML = `
+          <div>
+            <div style="margin-bottom:20px;">
+              <h3 style="margin:0 0 4px;">Editorial Promotion Applications (${pending.length} Pending)</h3>
+              <p style="color:var(--muted);font-size:0.85rem;margin:0;">
+                Review contributor and editor promotion requests. You can grant the requested tier, assign a different masthead position, or decline.
+              </p>
+            </div>
+
+            ${pending.length === 0 ? `<div style="padding:24px;background:var(--soft);border-radius:10px;text-align:center;color:var(--muted);margin-bottom:24px;">No applications currently awaiting review.</div>` : `
+              <div style="display:flex;flex-direction:column;gap:18px;margin-bottom:32px;">
+                ${pending.map(a => {
+                  const applicantName = a.applicant?.displayName || a.applicant?.username || "Applicant";
+                  const applicantUsername = a.applicant?.username || "";
+                  const currentRole = a.currentRole || a.applicant?.role || "Reader";
+                  const reqRole = a.requestedRole || "Contributing Writer";
+                  return `
+                    <article class="review" style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px;">
+                      <div style="flex:1;">
+                        <div class="eyebrow" style="margin-bottom:6px;">
+                          <b>${esc(applicantName)}</b> (@${esc(applicantUsername)}) · Applied ${date(a.appliedAt)}
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+                          <span style="font-size:0.8rem;color:var(--muted);">Current Standing:</span>
+                          <span class="status status-${esc(currentRole.toLowerCase().replace(/\s+/g, '-'))}">${esc(currentRole)}</span>
+                          <span style="font-size:0.8rem;color:var(--muted);">→ Requested:</span>
+                          <span style="font-size:0.82rem;font-weight:700;color:var(--accent);background:var(--soft);padding:3px 10px;border-radius:999px;border:1px solid var(--line);">${esc(reqRole)}</span>
+                        </div>
+                        <blockquote style="border-left:3px solid var(--accent);margin:12px 0;padding:10px 16px;background:var(--paper);border-radius:0 8px 8px 0;font-style:italic;color:var(--ink);line-height:1.6;">
+                          "${esc(a.motivation)}"
+                        </blockquote>
+                        ${a.applicant?.bio ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:6px;">Bio: ${esc(a.applicant.bio)}</div>` : ''}
+                      </div>
+                      <div class="review-actions" style="display:flex;flex-direction:column;gap:10px;min-width:220px;">
+                        <label style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Position to Assign</label>
+                        <select class="app-assign-select" id="app-assign-${a.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--paper);font-size:0.85rem;">
+                          <option value="Contributing Writer" ${reqRole === 'Contributing Writer' ? 'selected' : ''}>Contributing Writer (Level 2)</option>
+                          <option value="Featured Columnist" ${reqRole === 'Featured Columnist' ? 'selected' : ''}>Featured Columnist (Level 3)</option>
+                          <option value="Admin" ${reqRole === 'Admin' ? 'selected' : ''}>Admin (Founder & Publisher)</option>
+                        </select>
+                        <div style="display:flex;gap:8px;width:100%;margin-top:4px;">
+                          <button class="button small approve-app" data-id="${a.id}" style="flex:1;">Approve</button>
+                          <button class="button small danger reject-app" data-id="${a.id}">Decline</button>
+                        </div>
+                      </div>
+                    </article>
+                  `;
+                }).join("")}
+              </div>
+            `}
+
+            ${past.length > 0 ? `
+              <div style="margin-top:32px;border-top:1px solid var(--line);padding-top:20px;">
+                <h4 style="margin:0 0 12px;color:var(--muted);">Past Application Decisions (${past.length})</h4>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  ${past.map(p => `
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--soft);border-radius:8px;font-size:0.88rem;">
+                      <div>
+                        <b>${esc(p.applicant?.displayName || p.applicant?.username || "Applicant")}</b> 
+                        <span style="color:var(--muted);font-size:0.8rem;">(@${esc(p.applicant?.username || "")}) · ${date(p.reviewedAt || p.appliedAt)}</span>
+                        ${p.reviewNotes ? `<span style="display:block;font-size:0.8rem;color:var(--muted);font-style:italic;margin-top:2px;">Note: ${esc(p.reviewNotes)}</span>` : ''}
+                      </div>
+                      <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="font-size:0.8rem;color:var(--muted);">Requested: ${esc(p.requestedRole || 'Writer')}</span>
+                        <span class="status status-${(p.status || '').toLowerCase()}">${esc(p.status)}</span>
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
       bindAdmin();
     } else {
-      out.innerHTML = `<table><thead><tr><th>Member</th><th>Role</th></tr></thead><tbody>${users.map((u) => `<tr><td><b>${esc(u.username)}</b></td><td><span class="status">${esc(u.role)}</span></td></tr>`).join("")}</tbody></table>`;
+      out.innerHTML = `
+        <div>
+          <div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+            <div>
+              <h3 style="margin:0 0 4px;">Editorial Community & Masthead Roster</h3>
+              <p style="color:var(--muted);font-size:0.85rem;margin:0;">
+                Directly manage user roles and promotion levels across InkWell's 5-tier masthead hierarchy.
+              </p>
+            </div>
+            <div style="font-size:0.82rem;background:var(--soft);padding:6px 14px;border-radius:8px;border:1px solid var(--line);color:var(--muted);">
+              Total Members: <b style="color:var(--ink);">${users.length}</b>
+            </div>
+          </div>
+
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="padding:12px 14px;">Member / Identity</th>
+                <th style="padding:12px 14px;">Current Masthead Title</th>
+                <th style="padding:12px 14px;">Role Level</th>
+                <th style="padding:12px 14px;min-width:200px;">Change Role Permission</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users.map((u) => {
+                const isMainAdmin = u.username === "editorial_admin" || (u.displayName === "G Nihal" && u.role === "Admin") || u.id === 1;
+                const editorialTitle = isMainAdmin ? "Founder & Publisher" : getEditorialRole(u, "community");
+                const memberName = u.displayName || u.username;
+                const roleClass = (u.role || "Reader").toLowerCase().replace(/\s+/g, "-");
+                
+                return `
+                  <tr style="border-bottom:1px solid var(--line);">
+                    <td style="padding:14px;">
+                      <div style="display:flex;align-items:center;gap:12px;">
+                        <div style="width:38px;height:38px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);font-size:0.9rem;border:1px solid var(--line);overflow:hidden;">
+                          ${u.profilePictureUrl ? `<img src="${esc(u.profilePictureUrl)}" style="width:100%;height:100%;object-fit:cover;">` : initials(u)}
+                        </div>
+                        <div>
+                          <div style="display:flex;align-items:center;gap:6px;">
+                            <b style="font-size:0.95rem;color:var(--ink);">${esc(memberName)}</b>
+                            ${isMainAdmin ? `<span style="background:var(--accent);color:#fff;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:4px;letter-spacing:0.5px;text-transform:uppercase;">FOUNDER & PUBLISHER</span>` : ''}
+                          </div>
+                          <small style="color:var(--muted);font-size:0.8rem;display:block;margin-top:2px;">
+                            @${esc(u.username)} · ${esc(u.email || "")}
+                          </small>
+                        </div>
+                      </div>
+                    </td>
+                    <td style="padding:14px;">
+                      <div style="font-weight:600;font-size:0.9rem;color:var(--ink);">${esc(editorialTitle)}</div>
+                      <small style="color:var(--muted);font-size:0.75rem;">${esc(u.profession || "Editorial Contributor")}</small>
+                    </td>
+                    <td style="padding:14px;">
+                      <span class="status status-${roleClass}" id="user-role-badge-${u.id}">
+                        ${esc(u.role || "Reader")}
+                      </span>
+                    </td>
+                    <td style="padding:14px;">
+                      ${isMainAdmin ? `
+                        <span style="font-size:0.82rem;color:var(--muted);font-style:italic;">Founder & Publisher</span>
+                      ` : `
+                        <select class="user-role-select" data-id="${u.id}" data-name="${esc(memberName)}" data-prev-role="${esc(u.role || 'Reader')}" style="padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:var(--paper);font-size:0.85rem;width:100%;max-width:220px;cursor:pointer;">
+                          <option value="Reader" ${u.role === 'Reader' ? 'selected' : ''}>Reader (Level 1)</option>
+                          <option value="Contributing Writer" ${u.role === 'Contributing Writer' || u.role === 'Editor' || u.role === 'Staff Editor' ? 'selected' : ''}>Contributing Writer (Level 2)</option>
+                          <option value="Featured Columnist" ${u.role === 'Featured Columnist' || u.role === 'Senior Editor' ? 'selected' : ''}>Featured Columnist (Level 3)</option>
+                          <option value="Admin" ${u.role === 'Admin' ? 'selected' : ''}>Admin (Founder & Publisher)</option>
+                        </select>
+                      `}
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
       bindAdmin();
     }
   };
@@ -2356,16 +2881,48 @@ async function admin() {
         (b.onclick = () =>
           review(`/api/admin/posts/${b.dataset.id}/review`, "Reject")),
     );
-    $$(".approve-app").forEach(
-      (b) =>
-        (b.onclick = () =>
-          review(`/api/admin/applications/${b.dataset.id}/review`, "Approve")),
-    );
-    $$(".reject-app").forEach(
-      (b) =>
-        (b.onclick = () =>
-          review(`/api/admin/applications/${b.dataset.id}/review`, "Reject")),
-    );
+    $$(".approve-app").forEach((b) => {
+      b.onclick = async () => {
+        const id = b.dataset.id;
+        const assignSelect = $(`#app-assign-${id}`);
+        const assignedRole = assignSelect ? assignSelect.value : "Contributing Writer";
+        try {
+          b.disabled = true;
+          b.textContent = "Approving...";
+          const res = await api(`/api/admin/applications/${id}/review`, {
+            method: "POST",
+            body: JSON.stringify({ action: "Approve", assignedRole }),
+          });
+          toast(res.message || `Application approved. Assigned ${assignedRole}!`);
+          admin();
+        } catch (e) {
+          toast(e.message, "error");
+          b.disabled = false;
+          b.textContent = "Approve";
+        }
+      };
+    });
+    $$(".reject-app").forEach((b) => {
+      b.onclick = async () => {
+        const id = b.dataset.id;
+        const note = prompt("Decline reason or feedback for applicant (optional):");
+        if (note === null) return;
+        try {
+          b.disabled = true;
+          b.textContent = "Declining...";
+          const res = await api(`/api/admin/applications/${id}/review`, {
+            method: "POST",
+            body: JSON.stringify({ action: "Reject", comments: note || "Application declined by the editorial desk." }),
+          });
+          toast(res.message || "Application declined.");
+          admin();
+        } catch (e) {
+          toast(e.message, "error");
+          b.disabled = false;
+          b.textContent = "Decline";
+        }
+      };
+    });
     $$(".delete-post").forEach(
       (b) =>
         (b.onclick = async () => {
@@ -2379,6 +2936,37 @@ async function admin() {
           }
         }),
     );
+    $$(".user-role-select", $("#admin-content")).forEach((sel) => {
+      sel.onchange = async (e) => {
+        const userId = e.target.dataset.id;
+        const newRole = e.target.value;
+        const userName = e.target.dataset.name;
+        const prevRole = e.target.dataset.prevRole;
+        if (!confirm(`Change ${userName}'s editorial standing from "${prevRole}" to "${newRole}"?`)) {
+          e.target.value = prevRole;
+          return;
+        }
+        try {
+          e.target.disabled = true;
+          await api(`/api/admin/users/${userId}/role`, {
+            method: "PUT",
+            body: JSON.stringify({ role: newRole }),
+          });
+          e.target.dataset.prevRole = newRole;
+          toast(`Updated ${userName}'s role to ${newRole}`);
+          const badge = $(`#user-role-badge-${userId}`);
+          if (badge) {
+            badge.textContent = newRole;
+            badge.className = `status status-${newRole.toLowerCase().replace(/\s+/g, "-")}`;
+          }
+        } catch (err) {
+          toast(err.message, "error");
+          e.target.value = prevRole;
+        } finally {
+          e.target.disabled = false;
+        }
+      };
+    });
   }
   async function review(url, action) {
     const comments = action === "Reject" ? prompt("Note:") : "";
