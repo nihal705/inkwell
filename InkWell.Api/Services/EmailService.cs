@@ -4,7 +4,7 @@ namespace InkWell.Api.Services;
 
 public interface IEmailService
 {
-    Task SendOtpEmailAsync(string toEmail, string otpCode);
+    Task SendOtpEmailAsync(string toEmail, string otpCode, string? templateType = null);
 }
 
 public class EmailJsService : IEmailService
@@ -18,10 +18,17 @@ public class EmailJsService : IEmailService
         _config = config;
     }
 
-    public async Task SendOtpEmailAsync(string toEmail, string otpCode)
+    public async Task SendOtpEmailAsync(string toEmail, string otpCode, string? templateType = null)
     {
         var serviceId  = Environment.GetEnvironmentVariable("EMAILJS_SERVICE_ID")  ?? _config["EmailJS:ServiceId"];
-        var templateId = Environment.GetEnvironmentVariable("EMAILJS_TEMPLATE_ID") ?? _config["EmailJS:TemplateId"];
+        
+        // Use dedicated EMAILJS_REGISTER_TEMPLATE_ID if templateType is register, otherwise fallback to EMAILJS_TEMPLATE_ID
+        var templateId = (templateType == "register" 
+            ? Environment.GetEnvironmentVariable("EMAILJS_REGISTER_TEMPLATE_ID") 
+            : null)
+            ?? Environment.GetEnvironmentVariable("EMAILJS_TEMPLATE_ID") 
+            ?? _config["EmailJS:TemplateId"];
+
         var publicKey  = Environment.GetEnvironmentVariable("EMAILJS_PUBLIC_KEY")  ?? _config["EmailJS:PublicKey"];
         var privateKey = Environment.GetEnvironmentVariable("EMAILJS_PRIVATE_KEY") ?? _config["EmailJS:PrivateKey"];
 
@@ -38,6 +45,8 @@ public class EmailJsService : IEmailService
             {
                 to_email = toEmail,
                 otp_code = otpCode,
+                subject = templateType == "register" ? "Your InkWell Verification Code" : "Reset Your InkWell Password",
+                purpose = templateType == "register" ? "account verification" : "password reset"
             }
         };
 
