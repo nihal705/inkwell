@@ -44,7 +44,7 @@ public class SeriesController(AppDbContext db) : ControllerBase
         return Ok(ApiMapper.Series(series, true));
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpPost]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpPost]
     public async Task<IActionResult> Create(SeriesCreateDto dto)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
@@ -77,7 +77,7 @@ public class SeriesController(AppDbContext db) : ControllerBase
         return Ok(new { message = "Series created successfully.", series = ApiMapper.Series(created, false) });
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, SeriesCreateDto dto)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
@@ -97,7 +97,7 @@ public class SeriesController(AppDbContext db) : ControllerBase
         return Ok(new { message = "Series updated successfully.", series = ApiMapper.Series(updated, true) });
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
         var series = await db.Series.Include(s => s.Posts).FirstOrDefaultAsync(x => x.Id == id);

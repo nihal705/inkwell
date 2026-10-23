@@ -20,6 +20,19 @@ public class AuthorsController(AppDbContext db) : ControllerBase
             .Where(x => x.AuthorId == id && x.Status == "Published")
             .OrderByDescending(x => x.PublishedAt)
             .ToListAsync();
-        return Ok(new { author = ApiMapper.User(user), posts = posts.Select(x => ApiMapper.Post(x)) });
+
+        var series = await db.Series
+            .Include(x => x.Author)
+            .Include(x => x.Posts)
+            .Where(x => x.AuthorId == id)
+            .OrderByDescending(x => x.UpdatedAt)
+            .ToListAsync();
+
+        return Ok(new
+        {
+            author = ApiMapper.User(user),
+            posts = posts.Select(x => ApiMapper.Post(x)),
+            series = series.Select(s => ApiMapper.Series(s, false))
+        });
     }
 }

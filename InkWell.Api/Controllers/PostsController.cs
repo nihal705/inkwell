@@ -49,7 +49,7 @@ public class PostsController(AppDbContext db) : ControllerBase
         return p.Status != "Published" && !mine ? NotFound(new { message = "That article is not available." }) : Ok(ApiMapper.Post(p, true));
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpGet("mine")]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpGet("mine")]
     public async Task<IActionResult> Mine()
     {
         var id = User.UserId();
@@ -126,11 +126,11 @@ public class PostsController(AppDbContext db) : ControllerBase
         }
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpGet("mine/{id:int}")]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpGet("mine/{id:int}")]
     public async Task<IActionResult> MineOne(int id) =>
         await Own(id) is { } p ? Ok(ApiMapper.Post(p, true)) : Forbid();
 
-    [Authorize(Roles = "Editor,Admin"), HttpPost]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpPost]
     public async Task<IActionResult> Create(PostCreateDto request)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
@@ -163,7 +163,7 @@ public class PostsController(AppDbContext db) : ControllerBase
         return Ok(new { message = admin ? "Article published." : "Article saved.", post = ApiMapper.Post(detail, true) });
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, PostCreateDto request)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
@@ -197,7 +197,7 @@ public class PostsController(AppDbContext db) : ControllerBase
         return Ok(new { message = User.IsInRole("Admin") ? "Article updated." : "Changes submitted for review." });
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpPost("{id:int}/submit")]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpPost("{id:int}/submit")]
     public async Task<IActionResult> Submit(int id)
     {
         var p = await Own(id);
@@ -211,7 +211,7 @@ public class PostsController(AppDbContext db) : ControllerBase
         return Ok(new { message = "Submitted for review." });
     }
 
-    [Authorize(Roles = "Editor,Admin"), HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
         var p = await Own(id);
