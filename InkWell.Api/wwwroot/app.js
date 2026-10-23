@@ -360,7 +360,7 @@ function shell(content) {
         <a class="brand" href="/" aria-label="InkWell home"><span class="nib">✦</span>Ink<span>Well</span></a>
         <button class="mobile-menu" aria-label="Open menu">☰</button>
         <div class="nav-links">
-          <a href="/">Home</a><a href="/articles">Articles</a><a href="/categories">Categories</a><a href="/library">Saved</a><a href="/about">About</a>
+          <a href="/">Home</a><a href="/articles">Articles</a><a href="/series">Series</a><a href="/categories">Categories</a><a href="/library">Saved</a><a href="/about">About</a>
         </div>
         <div class="nav-actions">
           <button class="icon" id="random-post" title="Surprise me">🎲</button>
@@ -384,7 +384,7 @@ function shell(content) {
     <footer>
       <div class="wrap footer-grid">
         <div><a class="brand" href="/">Ink<span>Well</span></a><p>Where readers become writers.</p></div>
-        <div><b>Explore</b><a href="/">Latest articles</a><a href="/categories">Categories</a><a href="/library">Saved</a></div>
+        <div><b>Explore</b><a href="/">Latest articles</a><a href="/articles">Catalog</a><a href="/series">Series</a><a href="/categories">Categories</a><a href="/library">Saved</a></div>
         <div><b>Write</b>${u ? `<a href="/editor/new">New article</a><a href="/editor">Dashboard</a>` : `<a href="/register">Start writing</a>`}</div>
         <div><b>Legal</b><a href="/about">About</a><a href="/privacy">Privacy</a><a href="/contact">Contact</a></div>
       </div>
@@ -419,6 +419,58 @@ function bindShell() {
       toast("No posts found");
     }
   });
+}
+
+// ==================== SPOTLIGHT CARD ====================
+function renderSpotlightCard(item) {
+  if (item.itemType === "Series" && item.series) {
+    const s = item.series;
+    return `
+      <a class="spotlight-card fade-in-up" href="/series/${esc(s.slug)}">
+        <div class="spotlight-cover">
+          <span class="spotlight-badge badge-series">✦ SERIES · ${s.partsCount} PARTS</span>
+          ${s.coverImageUrl ? `<img loading="lazy" src="${esc(s.coverImageUrl)}" alt="${esc(s.title)}">` : `<div style="width:100%;height:100%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:2rem;color:var(--accent);">✦</div>`}
+        </div>
+        <div class="spotlight-body">
+          <div class="spotlight-meta">
+            <span>By ${esc(s.author?.displayName || s.author?.username || "InkWell")}</span>
+            <span>·</span>
+            <span>${s.totalReadingTimeMinutes} min series</span>
+          </div>
+          <h3 class="spotlight-title">${esc(s.title)}</h3>
+          <p class="spotlight-excerpt">${esc(s.description || "An in-depth multi-part investigative series.")}</p>
+          <div class="spotlight-footer">
+            <span>${s.partsCount} In-Depth Chapters</span>
+            <span class="spotlight-cta">Explore Series →</span>
+          </div>
+        </div>
+      </a>
+    `;
+  } else if (item.post) {
+    const p = item.post;
+    return `
+      <a class="spotlight-card fade-in-up" href="/post/${p.id}">
+        <div class="spotlight-cover">
+          <span class="spotlight-badge">✦ EDITOR'S PICK</span>
+          ${p.mainImageUrl ? `<img loading="lazy" src="${esc(p.mainImageUrl)}" alt="${esc(p.title)}">` : `<div style="width:100%;height:100%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:2rem;color:var(--accent);">✦</div>`}
+        </div>
+        <div class="spotlight-body">
+          <div class="spotlight-meta">
+            <span>By ${esc(p.author?.displayName || p.author?.username || "InkWell")}</span>
+            <span>·</span>
+            <span>${p.readingTimeMinutes} min read</span>
+          </div>
+          <h3 class="spotlight-title">${esc(p.title)}</h3>
+          <p class="spotlight-excerpt">${esc(p.excerpt || "")}</p>
+          <div class="spotlight-footer">
+            <span>${date(p.publishedAt || p.createdAt)}</span>
+            <span class="spotlight-cta">Read Article →</span>
+          </div>
+        </div>
+      </a>
+    `;
+  }
+  return "";
 }
 
 // ==================== POST CARD ====================
@@ -541,6 +593,9 @@ async function home() {
       <div class="hero-art"><div class="orb"></div><div class="paper-note">MAKE ROOM<br>FOR IDEAS <b>↗</b></div><span class="spark one">✦</span><span class="spark two">✦</span></div>
     </section>
 
+    <!-- ADMIN CURATED SPOTLIGHT -->
+    <section class="wrap spotlight-section" id="spotlight-section" style="display:none;"></section>
+
     <section class="wrap category-bar" id="category-bar"></section>
     <section class="wrap" id="articles">
       <div class="section-heading">
@@ -557,11 +612,33 @@ async function home() {
   `);
 
   try {
-    const [cats, data] = await Promise.all([
+    const [cats, data, featured] = await Promise.all([
       api("/api/categories"),
       api("/api/posts"),
+      api("/api/featured").catch(() => []),
     ]);
     state.categories = cats;
+
+    // Render Admin Curated Spotlight if configured
+    if (featured && featured.length > 0) {
+      const spotlightEl = $("#spotlight-section");
+      if (spotlightEl) {
+        spotlightEl.style.display = "block";
+        spotlightEl.innerHTML = `
+          <div class="spotlight-header">
+            <div>
+              <div class="eyebrow">Curated Selection</div>
+              <h2>Editor's Spotlight</h2>
+            </div>
+            <a class="link-button" href="/series">Browse all series ↗</a>
+          </div>
+          <div class="spotlight-grid">
+            ${featured.map(renderSpotlightCard).join("")}
+          </div>
+        `;
+      }
+    }
+
     $("#category-bar").innerHTML =
       `<a class="chip active" href="/articles">All (${data.total})</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
     $("#posts").innerHTML = data.items.length
@@ -637,6 +714,150 @@ async function articlesPage(page = 1) {
     }
   } catch (e) {
     $("#posts").innerHTML = empty("Could not load articles.", "Try again", "/articles");
+  }
+}
+
+// ==================== SERIES PAGES ====================
+async function seriesListPage() {
+  updateMeta(
+    "Series & Anthologies — InkWell",
+    "Deep-dive multi-part investigative series and long-form anthologies.",
+  );
+  shell(`
+    <section class="wrap series-directory-hero">
+      <div class="eyebrow">Investigative & Thematic Collections</div>
+      <h1>Editorial Series</h1>
+      <p>Extended investigative journalism, architectural studies, and deep-dives organized into episodic chapters.</p>
+    </section>
+    <section class="wrap">
+      <div class="series-grid" id="series-grid">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </section>
+  `);
+
+  try {
+    const list = await api("/api/series");
+    const container = $("#series-grid");
+    if (!container) return;
+    if (!list || list.length === 0) {
+      container.innerHTML = empty("No series published yet.", "Back home", "/");
+      return;
+    }
+
+    container.innerHTML = list.map((s) => `
+      <a class="series-card fade-in-up" href="/series/${esc(s.slug)}">
+        <div class="series-card-cover">
+          <span class="series-chapter-badge">${s.partsCount} ${s.partsCount === 1 ? 'Chapter' : 'Chapters'}</span>
+          ${s.coverImageUrl ? `<img loading="lazy" src="${esc(s.coverImageUrl)}" alt="${esc(s.title)}">` : `<div style="width:100%;height:100%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:var(--accent);">✦</div>`}
+        </div>
+        <div class="series-card-body">
+          <div style="font-size:0.8rem;color:var(--muted);margin-bottom:6px;">
+            By ${esc(s.author?.displayName || s.author?.username || "InkWell")} · ${s.totalReadingTimeMinutes} min total read
+          </div>
+          <h2 class="series-card-title">${esc(s.title)}</h2>
+          <p class="series-card-desc">${esc(s.description || "An investigative multi-part series.")}</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.82rem;font-weight:600;color:var(--accent);">
+            <span>Start Reading</span>
+            <span>→</span>
+          </div>
+        </div>
+      </a>
+    `).join("");
+  } catch (err) {
+    $("#series-grid").innerHTML = empty("Failed to load series.", "Retry", "/series");
+  }
+}
+
+async function seriesDetailPage(slug) {
+  shell(`<div class="article-skeleton wrap"></div>`);
+  try {
+    const s = await api(`/api/series/${encodeURIComponent(slug)}`);
+    updateMeta(
+      `${s.title} (Series) — InkWell`,
+      s.description || `A multi-part series by ${s.author?.displayName || s.author?.username}`,
+      s.coverImageUrl
+    );
+
+    const firstPostId = s.posts && s.posts.length > 0 ? s.posts[0].id : null;
+
+    shell(`
+      <div class="wrap">
+        <section class="series-detail-hero">
+          <div class="series-hero-content">
+            <div class="eyebrow"><a href="/series" style="color:var(--muted);">Series</a> · Multi-Part Anthology</div>
+            <h1>${esc(s.title)}</h1>
+            <p style="font-size:1.1rem;color:var(--muted);line-height:1.6;margin:16px 0;">${esc(s.description || "")}</p>
+            
+            <div class="series-hero-stats">
+              <div class="series-hero-stat">
+                <b>${s.partsCount}</b>
+                <span>${s.partsCount === 1 ? 'Chapter' : 'Chapters'}</span>
+              </div>
+              <div class="series-hero-stat">
+                <b>${s.totalReadingTimeMinutes}</b>
+                <span>Total Mins</span>
+              </div>
+              <div class="series-hero-stat">
+                <b>${date(s.createdAt)}</b>
+                <span>Released</span>
+              </div>
+            </div>
+
+            <div class="series-hero-meta">
+              <span class="mini-avatar">${avatarImg(s.author)}</span>
+              <div>
+                <b>${esc(s.author?.displayName || s.author?.username)}</b>
+                <small style="display:block;color:var(--muted);">${esc(s.author?.profession || "Writer & Editor")}</small>
+              </div>
+            </div>
+
+            ${firstPostId ? `
+              <div style="margin-top:24px;">
+                <a class="button" href="/post/${firstPostId}">Begin Reading Part 1 <span>→</span></a>
+              </div>
+            ` : ""}
+          </div>
+          <div class="series-hero-cover">
+            ${s.coverImageUrl ? `<img src="${esc(s.coverImageUrl)}" alt="${esc(s.title)}">` : `<div style="width:100%;height:100%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-size:3rem;color:var(--accent);">✦</div>`}
+          </div>
+        </section>
+
+        <section style="margin-bottom:60px;">
+          <div style="margin-bottom:28px;">
+            <div class="eyebrow">The Complete Series</div>
+            <h2 style="font-family:Fraunces,Georgia,serif;font-size:1.75rem;margin:4px 0 0;">Table of Chapters</h2>
+          </div>
+
+          <div class="chapter-timeline">
+            ${s.posts && s.posts.length > 0 ? s.posts.map((p, idx) => `
+              <a class="chapter-item fade-in-up" href="/post/${p.id}">
+                <div class="chapter-number-badge">
+                  <small>Part</small>
+                  <span>${String(p.seriesOrder || idx + 1).padStart(2, '0')}</span>
+                </div>
+                <div class="chapter-info">
+                  <h3>${esc(p.title)}</h3>
+                  <p>${esc(p.excerpt || "")}</p>
+                  <div class="chapter-meta">
+                    <span>${p.readingTimeMinutes} min read</span>
+                    <span>·</span>
+                    <span>${date(p.publishedAt || p.createdAt)}</span>
+                  </div>
+                </div>
+                ${p.mainImageUrl ? `
+                  <div class="chapter-item-thumbnail">
+                    <img loading="lazy" src="${esc(p.mainImageUrl)}" alt="">
+                  </div>
+                ` : ""}
+              </a>
+            `).join("") : `<div class="empty-state">No chapters have been published in this series yet.</div>`}
+          </div>
+        </section>
+      </div>
+    `);
+  } catch (err) {
+    shell(`<section class="wrap page-head">${empty("Series not found.", "Browse all series", "/series")}</section>`);
   }
 }
 
@@ -845,6 +1066,61 @@ async function postPage(id) {
       </div>
     `;
 
+    // Series Navigation Data
+    const seriesBadgeHtml = p.series ? `
+      <div class="series-badge-row">
+        <a href="/series/${esc(p.series.slug)}" class="series-pill" title="View all chapters in this series">
+          <span class="series-tag">SERIES</span>
+          <span class="series-part-label">Part ${p.seriesOrder || 1} of ${p.series.parts?.length || 1}</span>
+          <span class="series-dot">·</span>
+          <span class="series-title-text">${esc(p.series.title)}</span>
+        </a>
+      </div>
+    ` : "";
+
+    const seriesRoadmapHtml = p.series && p.series.parts && p.series.parts.length > 1 ? `
+      <div class="side-block series-roadmap-card">
+        <div class="series-roadmap-header">
+          <div class="eyebrow" style="margin-bottom:2px;">Multi-Part Series</div>
+          <a href="/series/${esc(p.series.slug)}" class="series-roadmap-title">${esc(p.series.title)}</a>
+        </div>
+        <div class="series-roadmap-list">
+          ${p.series.parts.map(part => `
+            <a href="/post/${part.id}" class="series-roadmap-item ${part.isCurrent ? 'active' : ''}">
+              <span class="part-number">${part.seriesOrder}</span>
+              <span class="part-title">${esc(part.title)}</span>
+              ${part.isCurrent ? '<span class="current-badge">Reading</span>' : ''}
+            </a>
+          `).join('')}
+        </div>
+      </div>
+    ` : "";
+
+    let prevPart = null;
+    let nextPart = null;
+    if (p.series && p.series.parts && p.series.parts.length > 1) {
+      const currentIdx = p.series.parts.findIndex(x => x.id === p.id);
+      if (currentIdx > 0) prevPart = p.series.parts[currentIdx - 1];
+      if (currentIdx >= 0 && currentIdx < p.series.parts.length - 1) nextPart = p.series.parts[currentIdx + 1];
+    }
+
+    const seriesNavFooterHtml = (prevPart || nextPart) ? `
+      <div class="series-nav-footer">
+        ${prevPart ? `
+          <a href="/post/${prevPart.id}" class="series-nav-btn prev">
+            <span class="nav-dir">← Previous Chapter</span>
+            <span class="nav-title">Part ${prevPart.seriesOrder}: ${esc(prevPart.title)}</span>
+          </a>
+        ` : `<div></div>`}
+        ${nextPart ? `
+          <a href="/post/${nextPart.id}" class="series-nav-btn next">
+            <span class="nav-dir">Next Chapter →</span>
+            <span class="nav-title">Part ${nextPart.seriesOrder}: ${esc(nextPart.title)}</span>
+          </a>
+        ` : `<div></div>`}
+      </div>
+    ` : "";
+
     shell(`
       <div class="wrap article-layout">
         <!-- DESKTOP LEFT SIDEBAR -->
@@ -869,7 +1145,11 @@ async function postPage(id) {
             ${toolsHtml}
           </div>
 
-          <div class="article-head"><div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div><h1>${esc(p.title)}</h1></div>
+          <div class="article-head">
+            ${seriesBadgeHtml}
+            <div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div>
+            <h1>${esc(p.title)}</h1>
+          </div>
           ${p.mainImageUrl ? `<img class="article-cover" src="${esc(p.mainImageUrl)}" alt="">` : ""}
           
           <div class="article-content" id="article-content">
@@ -878,6 +1158,8 @@ async function postPage(id) {
             <hr>
             <div class="author-bio"><span class="mini-avatar large">${avatarImg(p.author)}</span><div><b>Written by ${esc(p.author.displayName || p.author.username)}</b><p>${esc(p.author.bio || "A contributing writer at InkWell.")}</p></div></div>
             
+            ${seriesNavFooterHtml}
+
             <!-- MOBILE SHARE (Below Author) -->
             <div class="mobile-only mobile-share-row">
               ${shareHtml}
@@ -887,6 +1169,7 @@ async function postPage(id) {
 
         <!-- DESKTOP RIGHT SIDEBAR -->
         <aside class="sidebar sidebar-right">
+          ${seriesRoadmapHtml}
           <div class="desktop-only">
             ${toc.length ? `<div class="side-block"><b>On this page</b><nav class="toc">${toc.map((t) => `<a class="toc-lv${t.level}" href="#${t.slug}" data-toc="${t.slug}">${esc(t.text)}</a>`).join("")}</nav></div>` : ""}
           </div>
@@ -1198,6 +1481,21 @@ async function postPage(id) {
         : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
     } catch {}
 
+    // Series Floating Up-Next Pill
+    $$(".series-up-next-pill").forEach((el) => el.remove());
+    let upNextPill = null;
+    if (nextPart) {
+      upNextPill = document.createElement("a");
+      upNextPill.className = "series-up-next-pill";
+      upNextPill.href = `/post/${nextPart.id}`;
+      upNextPill.innerHTML = `
+        <span class="up-next-label">Up Next · Part ${nextPart.seriesOrder}</span>
+        <span class="up-next-title">${esc(nextPart.title)}</span>
+        <span class="up-next-arrow">→</span>
+      `;
+      document.body.appendChild(upNextPill);
+    }
+
     // Scroll Sync
     const progressBar = $("#reading-progress-bar");
     const leftSidebar = $(".sidebar-left");
@@ -1213,6 +1511,15 @@ async function postPage(id) {
         Math.max(0, (scrolled / totalHeight) * 100),
       );
       if (progressBar) progressBar.style.width = `${progress}%`;
+
+      if (upNextPill) {
+        if (progress >= 80) {
+          upNextPill.classList.add("visible");
+        } else {
+          upNextPill.classList.remove("visible");
+        }
+      }
+
       if (progress > 10 && progress < 90) {
         let list = store.get("library", []);
         const item = list.find((x) => x.id === p.id);
@@ -1491,16 +1798,21 @@ async function editor() {
 async function composer(id) {
   if (!guard(["Editor", "Admin"])) return;
   updateMeta("Write an Article — InkWell", "Compose your next story.");
-  let post = id
-    ? await api(`/api/posts/mine/${id}`)
-    : {
-        title: "",
-        content: "",
-        mainImageUrl: "",
-        categories: [],
-        tags: [],
-        images: [],
-      };
+  const [post, seriesList] = await Promise.all([
+    id
+      ? api(`/api/posts/mine/${id}`)
+      : Promise.resolve({
+          title: "",
+          content: "",
+          mainImageUrl: "",
+          categories: [],
+          tags: [],
+          images: [],
+          seriesId: null,
+          seriesOrder: null,
+        }),
+    api("/api/series").catch(() => []),
+  ]);
   const curImg = post.mainImageUrl || "";
 
   shell(`
@@ -1537,6 +1849,17 @@ async function composer(id) {
           <h2>Story details</h2>
           <label>Cover image <span style="color:var(--danger)">*</span><input type="file" accept="image/*" id="cover-file"><input type="hidden" name="image" value="${esc(curImg)}"></label>
           <div class="image-preview" id="cover-preview">${curImg ? `<img src="${esc(curImg)}" alt="">` : "<span>No cover</span>"}</div>
+          <label>Part of a Series? (Optional)
+            <select name="seriesId">
+              <option value="">None (Standalone Article)</option>
+              ${seriesList.map((s) => `<option value="${s.id}" ${post.seriesId === s.id ? 'selected' : ''}>${esc(s.title)}</option>`).join("")}
+            </select>
+          </label>
+          <div id="series-order-wrap" style="${post.seriesId ? '' : 'display:none;'}">
+            <label>Series Chapter Number
+              <input type="number" min="1" max="100" name="seriesOrder" value="${post.seriesOrder || 1}">
+            </label>
+          </div>
           <label>Categories <input name="categories" value="${esc(post.categories.join(", "))}" placeholder="Culture, Design"></label>
           <label>Tags <input name="tags" value="${esc(post.tags.join(", "))}" placeholder="writing, ideas"></label>
         </aside>
@@ -1550,6 +1873,8 @@ async function composer(id) {
     image: $("[name=image]"),
     categories: $("[name=categories]"),
     tags: $("[name=tags]"),
+    seriesId: $("[name=seriesId]"),
+    seriesOrder: $("[name=seriesOrder]"),
   };
   const inlineFile = $("#inline-file");
   const previewDiv = $("#editor-preview");
@@ -1618,6 +1943,11 @@ async function composer(id) {
     });
   });
 
+  fields.seriesId?.addEventListener("change", (e) => {
+    const wrap = $("#series-order-wrap");
+    if (wrap) wrap.style.display = e.target.value ? "block" : "none";
+  });
+
   inlineFile?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1653,6 +1983,8 @@ async function composer(id) {
           .split(",")
           .map((x) => x.trim())
           .filter(Boolean),
+        seriesId: fields.seriesId?.value ? parseInt(fields.seriesId.value, 10) : null,
+        seriesOrder: fields.seriesId?.value && fields.seriesOrder?.value ? parseInt(fields.seriesOrder.value, 10) : null,
         saveAsDraft: draft,
       }),
     });
@@ -1672,7 +2004,7 @@ async function admin() {
   if (!guard(["Admin"])) return;
   updateMeta("Admin Panel — InkWell", "Editorial control room.");
   shell(
-    `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Editorial control room</div><h1>Good morning, editor.</h1></div></div><div class="stats" id="admin-stats"></div><div class="admin-tabs"><button class="active" data-tab="posts">Pending posts</button><button data-tab="applications">Editor applications</button><button data-tab="users">Community</button></div><div id="admin-content" class="table-wrap"></div></section>`,
+    `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Editorial control room</div><h1>Good morning, editor.</h1></div></div><div class="stats" id="admin-stats"></div><div class="admin-tabs"><button class="active" data-tab="posts">Pending posts</button><button data-tab="spotlight">Homepage Spotlight ✦</button><button data-tab="series">Series Manager</button><button data-tab="applications">Editor applications</button><button data-tab="users">Community</button></div><div id="admin-content" class="table-wrap"></div></section>`,
   );
   const [stats, posts, applications, users] = await Promise.all([
     api("/api/admin/stats"),
@@ -1688,9 +2020,10 @@ async function admin() {
   ]
     .map((x) => `<div><b>${x[0]}</b><span>${x[1]}</span></div>`)
     .join("");
-  const renderTab = (t) => {
+
+  const renderTab = async (t) => {
     const out = $("#admin-content");
-    if (t === "posts")
+    if (t === "posts") {
       out.innerHTML = posts.length
         ? posts
             .map(
@@ -1699,7 +2032,296 @@ async function admin() {
             )
             .join("")
         : empty("Nothing waiting.", "Home", "/");
-    else if (t === "applications")
+      bindAdmin();
+    } else if (t === "spotlight") {
+      out.innerHTML = `<div class="skeleton" style="height:260px;"></div>`;
+      try {
+        const featData = await api("/api/admin/featured");
+        let currentSpotlight = [...(featData.items || [])];
+
+        const renderSpotlightAdmin = () => {
+          out.innerHTML = `
+            <div class="admin-spotlight-wrapper">
+              <div class="drag-queue-container">
+                <div class="drag-queue-header">
+                  <div>
+                    <h3>Homepage Spotlight Showcase</h3>
+                    <p style="color:var(--muted);font-size:0.85rem;margin:4px 0 0;">
+                      Drag & drop cards using the grab handle (⠿) or use the arrows to reorder. Click "Save Order" to update the live homepage.
+                    </p>
+                  </div>
+                  <button class="button small" id="save-spotlight-btn">Save Order</button>
+                </div>
+                <div class="drag-queue-list" id="spotlight-queue">
+                  ${currentSpotlight.length === 0 ? `<div style="padding:28px;text-align:center;color:var(--muted);">No items featured yet. Select an article or series on the right to add!</div>` : currentSpotlight.map((it, idx) => `
+                    <div class="admin-drag-item" draggable="true" data-index="${idx}">
+                      <span class="drag-handle" title="Drag to reorder">⠿</span>
+                      ${it.imageUrl ? `<img class="drag-item-thumb" src="${esc(it.imageUrl)}">` : `<div class="drag-item-thumb"></div>`}
+                      <div class="drag-item-info">
+                        <div>
+                          <span class="drag-item-type ${it.itemType === 'Series' ? 'type-series' : ''}">${it.itemType}</span>
+                          <span class="drag-item-title">${esc(it.title)}</span>
+                        </div>
+                        <div class="drag-item-author">By ${esc(it.author || "Editorial")}</div>
+                      </div>
+                      <div class="drag-item-actions">
+                        <button class="drag-btn-move" data-action="up" data-index="${idx}" title="Move up" ${idx === 0 ? 'disabled style="opacity:0.3"' : ''}>▲</button>
+                        <button class="drag-btn-move" data-action="down" data-index="${idx}" title="Move down" ${idx === currentSpotlight.length - 1 ? 'disabled style="opacity:0.3"' : ''}>▼</button>
+                        <button class="drag-btn-delete" data-action="delete" data-index="${idx}" title="Remove from Spotlight">×</button>
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+
+              <div class="spotlight-picker-box">
+                <h3>Add to Spotlight</h3>
+                <p style="color:var(--muted);font-size:0.85rem;margin:0 0 14px;">Select an article or multi-part series to showcase on the homepage.</p>
+                <select id="spotlight-item-select">
+                  ${(featData.availableSeries && featData.availableSeries.length) ? `
+                    <optgroup label="Multi-Part Series">
+                      ${featData.availableSeries.map(s => `<option value="Series:${s.id}">${esc(s.title)} (${s.partsCount} parts)</option>`).join('')}
+                    </optgroup>
+                  ` : ''}
+                  ${(featData.availablePosts && featData.availablePosts.length) ? `
+                    <optgroup label="Published Articles">
+                      ${featData.availablePosts.map(p => `<option value="Post:${p.id}">${esc(p.title)} — by ${esc(p.author)}</option>`).join('')}
+                    </optgroup>
+                  ` : ''}
+                </select>
+                <button class="button secondary small" id="add-to-spotlight-btn" style="width:100%;">+ Add to Showcase</button>
+              </div>
+            </div>
+          `;
+
+          // Add to spotlight
+          $("#add-to-spotlight-btn")?.addEventListener("click", () => {
+            const val = $("#spotlight-item-select")?.value;
+            if (!val) return;
+            const [type, strId] = val.split(":");
+            const itemId = parseInt(strId, 10);
+            if (currentSpotlight.some(x => x.itemType === type && x.itemId === itemId)) {
+              toast("Item is already in spotlight queue", "error");
+              return;
+            }
+            if (type === "Series") {
+              const s = featData.availableSeries.find(x => x.id === itemId);
+              if (s) currentSpotlight.push({ itemType: "Series", itemId: s.id, title: s.title, author: s.author, imageUrl: s.imageUrl, partsCount: s.partsCount });
+            } else {
+              const p = featData.availablePosts.find(x => x.id === itemId);
+              if (p) currentSpotlight.push({ itemType: "Post", itemId: p.id, title: p.title, author: p.author, imageUrl: p.imageUrl });
+            }
+            renderSpotlightAdmin();
+            toast("Added to queue. Remember to Save Order!");
+          });
+
+          // Save spotlight order
+          $("#save-spotlight-btn")?.addEventListener("click", async () => {
+            const btn = $("#save-spotlight-btn");
+            btn.disabled = true;
+            btn.textContent = "Saving...";
+            try {
+              await api("/api/admin/featured", {
+                method: "PUT",
+                body: JSON.stringify({
+                  items: currentSpotlight.map(x => ({ itemType: x.itemType, itemId: x.itemId }))
+                })
+              });
+              toast("Homepage spotlight order saved successfully!");
+            } catch (err) {
+              toast(err.message, "error");
+            } finally {
+              btn.disabled = false;
+              btn.textContent = "Save Order";
+            }
+          });
+
+          // Move up / down / delete
+          $$(".drag-btn-move", out).forEach(btn => {
+            btn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const idx = parseInt(btn.dataset.index, 10);
+              const act = btn.dataset.action;
+              if (act === "up" && idx > 0) {
+                const temp = currentSpotlight[idx - 1];
+                currentSpotlight[idx - 1] = currentSpotlight[idx];
+                currentSpotlight[idx] = temp;
+                renderSpotlightAdmin();
+              } else if (act === "down" && idx < currentSpotlight.length - 1) {
+                const temp = currentSpotlight[idx + 1];
+                currentSpotlight[idx + 1] = currentSpotlight[idx];
+                currentSpotlight[idx] = temp;
+                renderSpotlightAdmin();
+              }
+            });
+          });
+
+          $$(".drag-btn-delete", out).forEach(btn => {
+            btn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const idx = parseInt(btn.dataset.index, 10);
+              currentSpotlight.splice(idx, 1);
+              renderSpotlightAdmin();
+            });
+          });
+
+          // HTML5 Drag and Drop Handlers
+          let dragSrcIdx = -1;
+          const dragEls = $$(".admin-drag-item", out);
+          dragEls.forEach(el => {
+            el.addEventListener("dragstart", (e) => {
+              dragSrcIdx = parseInt(el.dataset.index, 10);
+              el.classList.add("dragging");
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("text/plain", dragSrcIdx);
+            });
+            el.addEventListener("dragend", () => {
+              el.classList.remove("dragging");
+              dragEls.forEach(x => x.classList.remove("drag-over"));
+            });
+            el.addEventListener("dragover", (e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              el.classList.add("drag-over");
+            });
+            el.addEventListener("dragleave", () => {
+              el.classList.remove("drag-over");
+            });
+            el.addEventListener("drop", (e) => {
+              e.preventDefault();
+              el.classList.remove("drag-over");
+              const targetIdx = parseInt(el.dataset.index, 10);
+              if (dragSrcIdx === -1 || dragSrcIdx === targetIdx) return;
+              const [draggedItem] = currentSpotlight.splice(dragSrcIdx, 1);
+              currentSpotlight.splice(targetIdx, 0, draggedItem);
+              renderSpotlightAdmin();
+            });
+          });
+        };
+
+        renderSpotlightAdmin();
+      } catch (err) {
+        out.innerHTML = empty("Failed to load spotlight settings.", "Retry", "/admin");
+      }
+    } else if (t === "series") {
+      out.innerHTML = `<div class="skeleton" style="height:260px;"></div>`;
+      try {
+        const seriesList = await api("/api/series");
+        out.innerHTML = `
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+              <div>
+                <h3 style="margin:0;">Multi-Part Series Catalog</h3>
+                <p style="color:var(--muted);font-size:0.85rem;margin:4px 0 0;">Create and organize long-form investigative series.</p>
+              </div>
+              <button class="button small" id="btn-create-series">+ Create New Series</button>
+            </div>
+
+            <!-- CREATE SERIES FORM -->
+            <div id="series-create-form" style="display:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px;">
+              <h4 style="margin:0 0 16px;">Create a New Series</h4>
+              <div style="display:flex;flex-direction:column;gap:12px;">
+                <label>Series Title <span style="color:var(--danger)">*</span>
+                  <input type="text" id="new-series-title" placeholder="e.g., Bengaluru's Transit Revolution">
+                </label>
+                <label>Description / Premise
+                  <textarea id="new-series-desc" rows="3" placeholder="A multi-part study exploring transit infrastructure, metro tunneling, and last-mile connectivity..."></textarea>
+                </label>
+                <label>Cover Image URL (or upload file below)
+                  <input type="text" id="new-series-cover" placeholder="https://res.cloudinary.com/...">
+                </label>
+                <label>Upload Cover Image File
+                  <input type="file" accept="image/*" id="new-series-file">
+                </label>
+                <div style="display:flex;gap:10px;margin-top:8px;">
+                  <button class="button small" id="submit-new-series">Create Series</button>
+                  <button class="button small secondary" id="cancel-new-series">Cancel</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="series-admin-grid">
+              ${seriesList.length === 0 ? `<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted);">No series created yet. Click "+ Create New Series" above!</div>` : seriesList.map(s => `
+                <div class="series-admin-card">
+                  <div style="display:flex;gap:12px;margin-bottom:12px;">
+                    ${s.coverImageUrl ? `<img src="${esc(s.coverImageUrl)}" style="width:70px;height:50px;object-fit:cover;border-radius:6px;background:var(--soft);">` : `<div style="width:70px;height:50px;background:var(--soft);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--accent);">✦</div>`}
+                    <div style="flex:1;min-width:0;">
+                      <h4 style="margin:0 0 4px;font-size:0.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(s.title)}</h4>
+                      <small style="color:var(--muted);">${s.partsCount} ${s.partsCount === 1 ? 'part' : 'parts'} · By ${esc(s.author?.displayName || s.author?.username)}</small>
+                    </div>
+                  </div>
+                  <p>${esc(s.description || "No description provided.")}</p>
+                  <div class="series-admin-card-actions">
+                    <a href="/series/${esc(s.slug)}" target="_blank" style="color:var(--accent);font-weight:600;">View Page ↗</a>
+                    <button class="link-button danger-link delete-series-btn" data-id="${s.id}" style="color:var(--danger)">Delete</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+
+        $("#btn-create-series")?.addEventListener("click", () => {
+          $("#series-create-form").style.display = "block";
+          $("#new-series-title").focus();
+        });
+        $("#cancel-new-series")?.addEventListener("click", () => {
+          $("#series-create-form").style.display = "none";
+        });
+
+        $("#new-series-file")?.addEventListener("change", async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          try {
+            toast("Uploading cover image...");
+            const url = await uploadImage(file);
+            $("#new-series-cover").value = url;
+            toast("Cover image uploaded!");
+          } catch (err) {
+            toast(err.message, "error");
+          }
+        });
+
+        $("#submit-new-series")?.addEventListener("click", async () => {
+          const title = $("#new-series-title").value.trim();
+          const desc = $("#new-series-desc").value.trim();
+          const cover = $("#new-series-cover").value.trim();
+          if (!title) {
+            toast("Series title is required", "error");
+            return;
+          }
+          try {
+            await api("/api/series", {
+              method: "POST",
+              body: JSON.stringify({
+                title,
+                description: desc,
+                coverImageUrl: cover || null
+              })
+            });
+            toast("Series created successfully!");
+            renderTab("series");
+          } catch (err) {
+            toast(err.message, "error");
+          }
+        });
+
+        $$(".delete-series-btn", out).forEach(btn => {
+          btn.addEventListener("click", async () => {
+            if (!confirm("Are you sure you want to delete this series? Articles in it will NOT be deleted, only unlinked.")) return;
+            try {
+              await api(`/api/series/${btn.dataset.id}`, { method: "DELETE" });
+              toast("Series deleted");
+              renderTab("series");
+            } catch (err) {
+              toast(err.message, "error");
+            }
+          });
+        });
+      } catch (err) {
+        out.innerHTML = empty("Failed to load series catalog.", "Retry", "/admin");
+      }
+    } else if (t === "applications") {
       out.innerHTML = applications.filter((a) => a.status === "Pending").length
         ? applications
             .filter((a) => a.status === "Pending")
@@ -1709,9 +2331,11 @@ async function admin() {
             )
             .join("")
         : empty("No applications.", "Home", "/");
-    else
+      bindAdmin();
+    } else {
       out.innerHTML = `<table><thead><tr><th>Member</th><th>Role</th></tr></thead><tbody>${users.map((u) => `<tr><td><b>${esc(u.username)}</b></td><td><span class="status">${esc(u.role)}</span></td></tr>`).join("")}</tbody></table>`;
-    bindAdmin();
+      bindAdmin();
+    }
   };
   renderTab("posts");
   $$(".admin-tabs button").forEach((b) =>
@@ -1823,6 +2447,7 @@ function searchModal() {
 async function render() {
   const route = location.pathname;
   window.scrollTo({ top: 0, behavior: "instant" });
+  $$(".series-up-next-pill").forEach((el) => el.remove());
   try {
     if (route === "/") await home();
     else if (route === "/articles" || route.startsWith("/articles")) {
@@ -1830,6 +2455,9 @@ async function render() {
       const page = parseInt(urlParams.get("page") || "1", 10);
       await articlesPage(page);
     }
+    else if (route === "/series") await seriesListPage();
+    else if (route.startsWith("/series/"))
+      await seriesDetailPage(decodeURIComponent(route.split("/").pop()));
     else if (route === "/login") authPage("login");
     else if (route === "/register") authPage("register");
     else if (route === "/forgot-password") forgotPasswordPage();
