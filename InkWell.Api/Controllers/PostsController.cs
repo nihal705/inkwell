@@ -17,7 +17,8 @@ public class PostsController(AppDbContext db) : ControllerBase
         .Include(x => x.Author)
         .Include(x => x.Images)
         .Include(x => x.PostCategories).ThenInclude(x => x.Category)
-        .Include(x => x.PostTags).ThenInclude(x => x.Tag);
+        .Include(x => x.PostTags).ThenInclude(x => x.Tag)
+        .Include(x => x.Series!).ThenInclude(s => s.Posts);
 
     [AllowAnonymous, HttpGet]
     public async Task<IActionResult> List(string? search, string? category, string? tag, int page = 1)
@@ -147,6 +148,8 @@ public class PostsController(AppDbContext db) : ControllerBase
             Content = request.Content.Trim(),
             MainImageUrl = request.MainImageUrl?.Trim(),
             AuthorId = User.UserId(),
+            SeriesId = request.SeriesId,
+            SeriesOrder = request.SeriesOrder,
             Status = admin ? "Published" : request.SaveAsDraft ? "Draft" : "PendingReview",
             PublishedAt = admin ? DateTime.UtcNow : null
         };
@@ -173,6 +176,8 @@ public class PostsController(AppDbContext db) : ControllerBase
         p.Title = request.Title.Trim();
         p.Content = request.Content.Trim();
         p.MainImageUrl = request.MainImageUrl?.Trim();
+        p.SeriesId = request.SeriesId;
+        p.SeriesOrder = request.SeriesOrder;
         p.UpdatedAt = DateTime.UtcNow;
 
         if (User.IsInRole("Admin"))

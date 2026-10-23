@@ -47,6 +47,26 @@ public class PostCreateDto
     public List<string> Categories { get; set; } = []; 
     public List<string> Tags { get; set; } = []; 
     public bool SaveAsDraft { get; set; } 
+    public int? SeriesId { get; set; }
+    public int? SeriesOrder { get; set; }
+}
+
+public class SeriesCreateDto
+{
+    [Required, MaxLength(255)] public string Title { get; set; } = "";
+    public string? Description { get; set; }
+    public string? CoverImageUrl { get; set; }
+}
+
+public class FeaturedItemDto
+{
+    [Required] public string ItemType { get; set; } = "Post"; // "Post" or "Series"
+    [Required] public int ItemId { get; set; }
+}
+
+public class UpdateFeaturedDto
+{
+    public List<FeaturedItemDto> Items { get; set; } = [];
 }
 
 public class ReviewDto { [Required] public string Action { get; set; } = ""; public string? Comments { get; set; } }
