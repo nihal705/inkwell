@@ -1,6 +1,18 @@
 using System.ComponentModel.DataAnnotations;
 namespace InkWell.Api.DTOs;
 
+public class RegisterOtpRequestDto
+{
+    [Required(ErrorMessage = "Email is required.")]
+    [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
+    public string Email { get; set; } = "";
+
+    [Required(ErrorMessage = "Username is required.")]
+    [RegularExpression(@"^[A-Za-z0-9._\- ]{3,40}$",
+        ErrorMessage = "Username can only contain letters, numbers, dots, hyphens, underscores and spaces (3–40 characters).")]
+    public string Username { get; set; } = "";
+}
+
 public class RegisterDto
 {
     [Required(ErrorMessage = "Username is required.")]
@@ -16,6 +28,10 @@ public class RegisterDto
     [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d).{8,}$",
         ErrorMessage = "Password must be at least 8 characters and include a letter and a number.")]
     public string Password { get; set; } = "";
+
+    [Required(ErrorMessage = "Verification code is required.")]
+    [StringLength(6, MinimumLength = 6, ErrorMessage = "Verification code must be 6 digits.")]
+    public string OtpCode { get; set; } = "";
 }
 public class LoginDto { [Required, EmailAddress] public string Email { get; set; } = ""; [Required] public string Password { get; set; } = ""; }
 public class ProfileDto
@@ -30,7 +46,11 @@ public class ProfileDto
   public string? TwitterHandle { get; set; }
   public string? LinkedInUrl { get; set; }
 }
-public class EditorApplicationDto { [Required, MinLength(30)] public string Motivation { get; set; } = ""; }
+public class EditorApplicationDto
+{
+    [Required, MinLength(20)] public string Motivation { get; set; } = "";
+    public string RequestedRole { get; set; } = "Contributing Writer";
+}
 
 public class PostImageDto 
 { 
@@ -69,7 +89,17 @@ public class UpdateFeaturedDto
     public List<FeaturedItemDto> Items { get; set; } = [];
 }
 
-public class ReviewDto { [Required] public string Action { get; set; } = ""; public string? Comments { get; set; } }
+public class ReviewDto
+{
+    [Required] public string Action { get; set; } = "";
+    public string? Comments { get; set; }
+    public string? AssignedRole { get; set; }
+}
+
+public class UpdateRoleDto
+{
+    [Required] public string Role { get; set; } = "Reader";
+}
 
 public class ForgotPasswordRequestDto
 {
