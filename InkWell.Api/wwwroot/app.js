@@ -542,7 +542,7 @@ function renderSpotlightCard(item) {
           <p class="spotlight-excerpt">${esc(s.description || "An in-depth multi-part investigative series.")}</p>
           <div class="spotlight-footer">
             <span>${s.partsCount} In-Depth Chapters</span>
-            <span class="spotlight-cta">Explore Series →</span>
+            <span class="spotlight-cta">Explore full series →</span>
           </div>
         </div>
       </a>
@@ -565,7 +565,7 @@ function renderSpotlightCard(item) {
           <p class="spotlight-excerpt">${esc(p.excerpt || "")}</p>
           <div class="spotlight-footer">
             <span>${date(p.publishedAt || p.createdAt)}</span>
-            <span class="spotlight-cta">Read Article →</span>
+            <span class="spotlight-cta">Read full article →</span>
           </div>
         </div>
       </a>
@@ -591,7 +591,7 @@ function card(p) {
           <span><a href="/author/${p.author.id}">${esc(authorName)}</a> · ${date(p.publishedAt || p.createdAt)}</span>
           <span>${p.readingTimeMinutes} min</span>
         </div>
-        <a class="card-read-more" href="/post/${p.id}">Read article <span>→</span></a>
+        <a class="card-read-more" href="/post/${p.id}">Read full article <span>→</span></a>
       </div>
     </div>
   </article>`;
@@ -860,8 +860,8 @@ async function seriesListPage() {
           </div>
           <h2 class="series-card-title">${esc(s.title)}</h2>
           <p class="series-card-desc">${esc(s.description || "An investigative multi-part series.")}</p>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.82rem;font-weight:600;color:var(--accent);">
-            <span>Start Reading</span>
+          <div class="series-card-footer">
+            <span>Explore full series</span>
             <span>→</span>
           </div>
         </div>
@@ -948,6 +948,7 @@ async function seriesDetailPage(slug) {
                     <span>${p.readingTimeMinutes} min read</span>
                     <span>·</span>
                     <span>${date(p.publishedAt || p.createdAt)}</span>
+                    <span class="chapter-cta" style="margin-left:auto;font-weight:600;color:var(--accent);">Read full chapter →</span>
                   </div>
                 </div>
                 ${p.mainImageUrl ? `
@@ -2078,8 +2079,8 @@ async function author(id) {
                 </div>
                 <h3 class="series-card-title">${esc(s.title)}</h3>
                 <p class="series-card-desc">${esc(s.description || "")}</p>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.82rem;font-weight:600;color:var(--accent);">
-                  <span>Explore Series</span>
+                <div class="series-card-footer">
+                  <span>Explore full series</span>
                   <span>→</span>
                 </div>
               </div>
