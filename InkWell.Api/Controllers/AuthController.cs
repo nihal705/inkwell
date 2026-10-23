@@ -32,8 +32,62 @@ public class AuthController(AppDbContext db, IJwtService jwt, IPasswordHasher ha
     }
 
     // ============================================
-    // REGISTER (unchanged)
+    // REGISTER WITH EMAIL OTP VERIFICATION
     // ============================================
+    [HttpPost("register/request-otp")]
+    public async Task<IActionResult> RequestRegisterOtp(RegisterOtpRequestDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var firstError = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .FirstOrDefault();
+            return BadRequest(new { message = firstError ?? "Please check your inputs." });
+        }
+
+        var emailAddr = request.Email.Trim().ToLowerInvariant();
+        var username = request.Username.Trim();
+
+        if (await db.Users.AnyAsync(x => x.Email == emailAddr))
+            return Conflict(new { message = "That email is already registered." });
+
+        if (await db.Users.AnyAsync(x => x.Username == username))
+            return Conflict(new { message = "That username is already taken." });
+
+        if (!AllowOtpRequest(emailAddr))
+            return StatusCode(429, new { message = "Too many verification requests. Please wait a bit before requesting another code." });
+
+        // Invalidate any previous unused registration OTPs for this email
+        var oldOtps = await db.EmailVerificationOtps
+            .Where(o => o.Email == emailAddr && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+        foreach (var o in oldOtps) o.IsUsed = true;
+
+        var otpCode = Random.Shared.Next(100000, 1000000).ToString("D6");
+        var otpHash = hasher.Hash(otpCode);
+
+        db.EmailVerificationOtps.Add(new EmailVerificationOtp
+        {
+            Email = emailAddr,
+            OtpHash = otpHash,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(10),
+        });
+        await db.SaveChangesAsync();
+
+        try
+        {
+            await email.SendOtpEmailAsync(emailAddr, otpCode, "register");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EmailJS] Failed to send register OTP to {emailAddr}: {ex.Message}");
+            return StatusCode(500, new { message = "Could not send the verification email. Please check the address or try again." });
+        }
+
+        return Ok(new { message = $"Verification code sent to {emailAddr}." });
+    }
+
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto request)
     {
@@ -55,12 +109,38 @@ public class AuthController(AppDbContext db, IJwtService jwt, IPasswordHasher ha
         if (await db.Users.AnyAsync(x => x.Username == username))
             return Conflict(new { message = "That username is already taken." });
 
+        // Find the latest unused, unexpired registration OTP
+        var otpRecord = await db.EmailVerificationOtps
+            .Where(o => o.Email == emailAddr && !o.IsUsed && o.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (otpRecord is null)
+            return BadRequest(new { message = "Verification code expired or not found. Please click 'Send verification code' again." });
+
+        if (otpRecord.Attempts >= 5)
+        {
+            otpRecord.IsUsed = true;
+            await db.SaveChangesAsync();
+            return BadRequest(new { message = "Too many incorrect code attempts. Please request a new verification code." });
+        }
+
+        if (!hasher.Verify(request.OtpCode.Trim(), otpRecord.OtpHash))
+        {
+            otpRecord.Attempts++;
+            await db.SaveChangesAsync();
+            return BadRequest(new { message = "Incorrect verification code. Please check your inbox or spam folder." });
+        }
+
+        // Consume OTP
+        otpRecord.IsUsed = true;
+
         var user = new User
         {
             Username = username,
             Email = emailAddr,
             PasswordHash = hasher.Hash(request.Password),
-            Role = "Editor"
+            Role = "Reader"
         };
         db.Users.Add(user);
         await db.SaveChangesAsync();
