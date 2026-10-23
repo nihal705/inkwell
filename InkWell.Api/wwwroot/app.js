@@ -187,7 +187,45 @@ function updateMeta(title, description, image) {
   if (image) setMeta("property", "og:image", image);
 }
 
+// ==================== IN-MEMORY API CACHE ====================
+const apiCache = new Map();
+const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+
+function getCached(url) {
+  const item = apiCache.get(url);
+  if (!item) return null;
+  if (Date.now() - item.time > CACHE_TTL_MS) {
+    apiCache.delete(url);
+    return null;
+  }
+  return item.data;
+}
+
+function setCache(url, data) {
+  if (
+    url.startsWith("/api/posts") ||
+    url.startsWith("/api/categories") ||
+    url.startsWith("/api/featured") ||
+    url.startsWith("/api/authors") ||
+    url.startsWith("/api/series")
+  ) {
+    apiCache.set(url, { data, time: Date.now() });
+  }
+}
+
+function invalidateApiCache() {
+  apiCache.clear();
+}
+
 async function api(url, options = {}) {
+  const method = (options.method || "GET").toUpperCase();
+
+  // Return cached GET responses instantly if available
+  if (method === "GET") {
+    const cached = getCached(url);
+    if (cached) return cached;
+  }
+
   const headers = {
     "Content-Type": "application/json",
     ...(options.headers || {}),
@@ -207,6 +245,14 @@ async function api(url, options = {}) {
         : "Something went wrong.");
     throw new Error(error);
   }
+
+  if (method === "GET") {
+    setCache(url, data);
+  } else {
+    // Invalidate cache on mutations (create, edit, delete, role changes)
+    invalidateApiCache();
+  }
+
   return data;
 }
 
@@ -221,11 +267,17 @@ const state = {
 };
 document.documentElement.dataset.theme = state.theme;
 
+function clearShell() {
+  app.innerHTML = "";
+}
+
 function setSession(d) {
   state.token = d.token;
   state.user = d.user;
   localStorage.setItem("inkwell_token", d.token);
   localStorage.setItem("inkwell_user", JSON.stringify(d.user));
+  invalidateApiCache();
+  clearShell();
 }
 
 function logout() {
@@ -233,6 +285,8 @@ function logout() {
   state.token = null;
   localStorage.removeItem("inkwell_token");
   localStorage.removeItem("inkwell_user");
+  invalidateApiCache();
+  clearShell();
   navigate("/");
   toast("You are signed out.");
 }
@@ -378,7 +432,24 @@ document.addEventListener("click", (e) => {
 
 window.addEventListener("popstate", render);
 
+function updateNavActive() {
+  const cur = location.pathname;
+  $$(".nav-links a").forEach((a) => {
+    const h = a.getAttribute("href");
+    if (h === "/" && cur === "/") a.classList.add("active");
+    else if (h !== "/" && cur.startsWith(h)) a.classList.add("active");
+    else a.classList.remove("active");
+  });
+}
+
 function shell(content) {
+  const main = $("#main");
+  if (main) {
+    main.innerHTML = content;
+    $(".nav-links")?.classList.remove("open");
+    updateNavActive();
+    return;
+  }
   const u = state.user;
   app.innerHTML = `
     <header>
@@ -421,6 +492,7 @@ function shell(content) {
     <button class="back-top" id="back-top" aria-label="Back to top">↑</button>
   `;
   bindShell();
+  updateNavActive();
 }
 
 function bindShell() {
@@ -428,7 +500,8 @@ function bindShell() {
     state.theme = state.theme === "dark" ? "light" : "dark";
     localStorage.setItem("inkwell_theme", state.theme);
     document.documentElement.dataset.theme = state.theme;
-    render();
+    const btn = $("#theme");
+    if (btn) btn.textContent = state.theme === "dark" ? "☀" : "☾";
   });
   $("#logout")?.addEventListener("click", logout);
   $(".mobile-menu")?.addEventListener("click", () =>
@@ -510,14 +583,16 @@ function card(p) {
     </a>
     <div class="card-body">
       <div class="eyebrow">${p.categories.map(esc).join(" · ") || "InkWell"}</div>
-      <h3><a href="/post/${p.id}">${esc(p.title)}</a></h3>
+      <h3><a href="/post/${p.id}" title="${esc(p.title)}">${esc(p.title)}</a></h3>
       <p class="card-excerpt">${esc(p.excerpt)}</p>
-      <div class="byline">
-        <span class="mini-avatar">${avatarImg(p.author)}</span>
-        <span><a href="/author/${p.author.id}">${esc(authorName)}</a> · ${date(p.publishedAt || p.createdAt)}</span>
-        <span>${p.readingTimeMinutes} min</span>
+      <div class="card-footer-box">
+        <div class="byline">
+          <span class="mini-avatar">${avatarImg(p.author)}</span>
+          <span><a href="/author/${p.author.id}">${esc(authorName)}</a> · ${date(p.publishedAt || p.createdAt)}</span>
+          <span>${p.readingTimeMinutes} min</span>
+        </div>
+        <a class="card-read-more" href="/post/${p.id}">Read article <span>→</span></a>
       </div>
-      <a class="card-read-more" href="/post/${p.id}">Read article <span>→</span></a>
     </div>
   </article>`;
 }
@@ -798,7 +873,9 @@ async function seriesListPage() {
 }
 
 async function seriesDetailPage(slug) {
-  shell(`<div class="article-skeleton wrap"></div>`);
+  if (!getCached(`/api/series/${encodeURIComponent(slug)}`)) {
+    shell(`<div class="article-skeleton wrap"></div>`);
+  }
   try {
     const s = await api(`/api/series/${encodeURIComponent(slug)}`);
     updateMeta(
@@ -1039,7 +1116,9 @@ function libraryPage() {
 
 // ==================== POST PAGE ====================
 async function postPage(id) {
-  shell(`<div class="article-skeleton wrap"></div>`);
+  if (!getCached(`/api/posts/${id}`)) {
+    shell(`<div class="article-skeleton wrap"></div>`);
+  }
   try {
     const p = await api(`/api/posts/${id}`);
     updateMeta(
@@ -1964,7 +2043,9 @@ function profile() {
 }
 
 async function author(id) {
-  shell(`<div class="article-skeleton wrap"></div>`);
+  if (!getCached(`/api/authors/${id}`)) {
+    shell(`<div class="article-skeleton wrap"></div>`);
+  }
   try {
     const d = await api(`/api/authors/${id}`);
     const u = d.author;
@@ -2742,7 +2823,7 @@ async function admin() {
                       </div>
                       <div class="review-actions" style="display:flex;flex-direction:column;gap:10px;min-width:220px;">
                         <label style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Position to Assign</label>
-                        <select class="app-assign-select" id="app-assign-${a.id}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--paper);font-size:0.85rem;">
+                        <select class="app-assign-select" id="app-assign-${a.id}">
                           <option value="Contributing Writer" ${reqRole === 'Contributing Writer' ? 'selected' : ''}>Contributing Writer (Level 2)</option>
                           <option value="Featured Columnist" ${reqRole === 'Featured Columnist' ? 'selected' : ''}>Featured Columnist (Level 3)</option>
                           <option value="Admin" ${reqRole === 'Admin' ? 'selected' : ''}>Admin (Founder & Publisher)</option>
@@ -2844,7 +2925,7 @@ async function admin() {
                       ${isMainAdmin ? `
                         <span style="font-size:0.82rem;color:var(--muted);font-style:italic;">Founder & Publisher</span>
                       ` : `
-                        <select class="user-role-select" data-id="${u.id}" data-name="${esc(memberName)}" data-prev-role="${esc(u.role || 'Reader')}" style="padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:var(--paper);font-size:0.85rem;width:100%;max-width:220px;cursor:pointer;">
+                        <select class="user-role-select" data-id="${u.id}" data-name="${esc(memberName)}" data-prev-role="${esc(u.role || 'Reader')}">
                           <option value="Reader" ${u.role === 'Reader' ? 'selected' : ''}>Reader (Level 1)</option>
                           <option value="Contributing Writer" ${u.role === 'Contributing Writer' || u.role === 'Editor' || u.role === 'Staff Editor' ? 'selected' : ''}>Contributing Writer (Level 2)</option>
                           <option value="Featured Columnist" ${u.role === 'Featured Columnist' || u.role === 'Senior Editor' ? 'selected' : ''}>Featured Columnist (Level 3)</option>
@@ -3081,4 +3162,5 @@ addEventListener("keydown", (e) => {
     searchModal();
   }
 });
-ensureCloudinaryConfig().then(render);
+render();
+ensureCloudinaryConfig();

@@ -45,7 +45,8 @@ publish/
 *.tmp
 *.swp
 *~
-article.json
+article*.json
+**/article*.json
 post_article.py
 export_for_ai.ps1
 __pycache__/
