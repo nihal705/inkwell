@@ -16,6 +16,33 @@ var connectionString = Environment.GetEnvironmentVariable("NEON_CONNECTION_STRIN
     ?? builder.Configuration.GetConnectionString("NeonConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException("Neon connection string is missing. Check your .env file.");
+
+// Robust DNS fallback for local development environments with strict ISP/DNS filtering
+try
+{
+    var builderCs = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+    if (!string.IsNullOrWhiteSpace(builderCs.Host) && !System.Net.IPAddress.TryParse(builderCs.Host, out _))
+    {
+        try
+        {
+            System.Net.Dns.GetHostAddresses(builderCs.Host);
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+            var hostParts = builderCs.Host.Split('.');
+            var endpointId = hostParts[0].Replace("-pooler", "");
+            builderCs.Host = "18.138.49.39";
+            builderCs.Options = $"endpoint={endpointId}";
+            connectionString = builderCs.ConnectionString;
+            Console.WriteLine($"[Neon DNS Fallback] Switched to direct IP {builderCs.Host} with endpoint={endpointId}");
+        }
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[Neon Connection Init] {ex.Message}");
+}
+
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 
 var jwtKey = Environment.GetEnvironmentVariable("JWT_KEY")
