@@ -4,7 +4,7 @@ An article publishing platform where anyone can write and post. New writers regi
 
 Built with .NET 10, EF Core, Neon PostgreSQL, Cloudinary, and a vanilla JavaScript SPA.
 
-**Live:** [https://inkwell-3m7y.onrender.com](https://inkwell-3m7y.onrender.com)
+**Live:** [https://inkwell-magazine.vercel.app](https://inkwell-magazine.vercel.app)
 
 ---
 
@@ -35,10 +35,11 @@ Built with .NET 10, EF Core, Neon PostgreSQL, Cloudinary, and a vanilla JavaScri
 |---|---|
 | Backend | .NET 10 Web API, C# |
 | Database | PostgreSQL (Neon), EF Core |
+| Caching | In-Memory Caching (`IMemoryCache`) |
 | Auth | JWT Bearer + BCrypt password hashing |
 | Uploads | Cloudinary (unsigned uploads) |
-| Frontend | Vanilla JavaScript SPA + CSS |
-| Hosting | Render (Docker) |
+| Frontend | Vanilla JavaScript SPA + CSS (Vercel Edge CDN) |
+| Backend Hosting | Railway (Docker container) |
 
 ---
 
@@ -47,7 +48,7 @@ Built with .NET 10, EF Core, Neon PostgreSQL, Cloudinary, and a vanilla JavaScri
 ### 1. Clone and restore
 
 ```powershell
-git clone https://github.com/YOUR-USERNAME/inkwell.git
+git clone https://github.com/nihal705/inkwell.git
 cd inkwell
 dotnet restore
 ```
@@ -133,17 +134,20 @@ Sign in with the `ADMIN_EMAIL` and `ADMIN_PASSWORD` you set in `.env`. Always us
 
 ## Deployment
 
-### Render
+### Railway (Backend API)
 
-1. Push the repo to GitHub.
-2. Create a new **Web Service** on [render.com](https://render.com).
-3. Set **Root Directory** to `InkWell.Api` and **Runtime** to `Docker`.
-4. Add all environment variables from the table above.
-5. Deploy. The included `Dockerfile` handles the build.
+1. Push the repository to GitHub.
+2. In [railway.app](https://railway.app), click **New Project** → **Deploy from GitHub repo**.
+3. In Service **Settings**, set **Root Directory** to `/InkWell.Api`.
+4. Under **Networking**, generate a domain and set the target port to `8080`.
+5. In the **Variables** tab, add all environment variables from the table above.
+6. (Optional) Under **Settings** → **Serverless**, toggle on dormancy to scale down when idle.
 
-### Keep-alive (free tier)
+### Vercel (Frontend Edge CDN)
 
-Render free instances sleep after 15 minutes of inactivity. To keep InkWell awake, use [UptimeRobot](https://uptimerobot.com) to ping `https://your-app.onrender.com/api/health` every 5 minutes.
+1. Import the repository on [vercel.com](https://vercel.com).
+2. `vercel.json` automatically directs Vercel to serve `InkWell.Api/wwwroot` and proxies `/api/*` to Railway.
+3. Deploy. The static frontend is delivered instantly from Vercel's global CDN.
 
 ---
 
@@ -156,7 +160,7 @@ InkWell/
 │   ├── Data/              # AppDbContext, SeedData
 │   ├── DTOs/              # Request/response contracts
 │   ├── Models/            # EF Core entities
-│   ├── Services/          # JWT, password hashing
+│   ├── Services/          # JWT, caching, password hashing
 │   ├── wwwroot/           # Frontend SPA
 │   │   ├── index.html
 │   │   ├── app.js
@@ -167,6 +171,7 @@ InkWell/
 │   └── Program.cs
 ├── .env.example
 ├── .gitignore
+├── vercel.json
 ├── LICENSE
 └── README.md
 ```
