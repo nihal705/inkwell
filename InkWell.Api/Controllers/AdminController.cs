@@ -1,6 +1,7 @@
 using InkWell.Api.Data;
 using InkWell.Api.DTOs;
 using InkWell.Api.Models;
+using InkWell.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace InkWell.Api.Controllers;
 
 [ApiController, Route("api/admin"), Authorize(Roles = "Admin")]
-public class AdminController(AppDbContext db) : ControllerBase
+public class AdminController(AppDbContext db, AppCache appCache) : ControllerBase
 {
    IQueryable<Post> Details() => db.Posts
     .Include(x => x.Author)
@@ -33,7 +34,9 @@ public class AdminController(AppDbContext db) : ControllerBase
     public async Task<IActionResult> ReviewPost(int id, ReviewDto request)
     {
         if (request.Action is not ("Approve" or "Reject")) return BadRequest(new { message = "Choose Approve or Reject." }); if (request.Action == "Reject" && string.IsNullOrWhiteSpace(request.Comments)) return BadRequest(new { message = "A reason is required." });
-        var post = await db.Posts.FindAsync(id); if (post is null) return NotFound(); post.Status = request.Action == "Approve" ? "Published" : "Rejected"; if (post.Status == "Published") post.PublishedAt ??= DateTime.UtcNow; post.RejectionReason = post.Status == "Rejected" ? request.Comments!.Trim() : null; db.PostReviewHistory.Add(new PostReviewHistory { PostId = id, AdminId = User.UserId(), Action = request.Action, Comments = request.Comments }); await db.SaveChangesAsync(); return Ok(new { message = request.Action == "Approve" ? "Post approved." : "Post returned to the editor." });
+        var post = await db.Posts.FindAsync(id); if (post is null) return NotFound(); post.Status = request.Action == "Approve" ? "Published" : "Rejected"; if (post.Status == "Published") post.PublishedAt ??= DateTime.UtcNow; post.RejectionReason = post.Status == "Rejected" ? request.Comments!.Trim() : null; db.PostReviewHistory.Add(new PostReviewHistory { PostId = id, AdminId = User.UserId(), Action = request.Action, Comments = request.Comments }); await db.SaveChangesAsync();
+        appCache.InvalidatePostDetail(id);
+        return Ok(new { message = request.Action == "Approve" ? "Post approved." : "Post returned to the editor." });
     }
 
     [HttpPost("applications/{id:int}/review")]
@@ -81,6 +84,7 @@ public class AdminController(AppDbContext db) : ControllerBase
         if (post is null) return NotFound(new { message = "Post not found." });
         db.Posts.Remove(post);
         await db.SaveChangesAsync();
+        appCache.InvalidatePostDetail(id);
         return Ok(new { message = "Post deleted." });
     }
 }

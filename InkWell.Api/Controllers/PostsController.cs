@@ -1,9 +1,11 @@
 using InkWell.Api.Data;
 using InkWell.Api.DTOs;
 using InkWell.Api.Models;
+using InkWell.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -11,7 +13,7 @@ using System.Text.RegularExpressions;
 namespace InkWell.Api.Controllers;
 
 [ApiController, Route("api/posts")]
-public class PostsController(AppDbContext db) : ControllerBase
+public class PostsController(AppDbContext db, AppCache appCache) : ControllerBase
 {
     IQueryable<Post> WithDetails() => db.Posts
         .Include(x => x.Author)
@@ -23,30 +25,69 @@ public class PostsController(AppDbContext db) : ControllerBase
     [AllowAnonymous, HttpGet]
     public async Task<IActionResult> List(string? search, string? category, string? tag, int page = 1)
     {
-        var q = WithDetails().Where(x => x.Status == "Published");
+        var isAnonymous = User.Identity?.IsAuthenticated != true;
+        var cacheKey = appCache.GetPostsListKey(search, category, tag, page);
+
+        if (isAnonymous && appCache.Raw.TryGetValue(cacheKey, out object? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
+        var baseQ = db.Posts.Where(x => x.Status == "Published");
         
         if (!string.IsNullOrWhiteSpace(search))
-            q = q.Where(x => EF.Functions.ILike(x.Title, $"%{search}%") || EF.Functions.ILike(x.Content, $"%{search}%"));
+            baseQ = baseQ.Where(x => EF.Functions.ILike(x.Title, $"%{search}%") || EF.Functions.ILike(x.Content, $"%{search}%"));
             
         if (!string.IsNullOrWhiteSpace(category))
-            q = q.Where(x => x.PostCategories.Any(c => c.Category.Name == category || c.Category.Slug == category));
+            baseQ = baseQ.Where(x => x.PostCategories.Any(c => c.Category.Name == category || c.Category.Slug == category));
             
-        // Added tag filtering
+        if (!string.IsNullOrWhiteSpace(tag))
+            baseQ = baseQ.Where(x => x.PostTags.Any(t => t.Tag.Name == tag || t.Tag.Slug == tag));
+            
+        var total = await baseQ.CountAsync();
+
+        var q = WithDetails().Where(x => x.Status == "Published");
+        if (!string.IsNullOrWhiteSpace(search))
+            q = q.Where(x => EF.Functions.ILike(x.Title, $"%{search}%") || EF.Functions.ILike(x.Content, $"%{search}%"));
+        if (!string.IsNullOrWhiteSpace(category))
+            q = q.Where(x => x.PostCategories.Any(c => c.Category.Name == category || c.Category.Slug == category));
         if (!string.IsNullOrWhiteSpace(tag))
             q = q.Where(x => x.PostTags.Any(t => t.Tag.Name == tag || t.Tag.Slug == tag));
-            
-        var total = await q.CountAsync();
+
         var posts = await q.OrderByDescending(x => x.PublishedAt).Skip((Math.Max(1, page) - 1) * 9).Take(9).ToListAsync();
-        return Ok(new { items = posts.Select(x => ApiMapper.Post(x)), total, page, pageSize = 9 });
+        var result = new { items = posts.Select(x => ApiMapper.Post(x)), total, page, pageSize = 9 };
+
+        if (isAnonymous)
+        {
+            appCache.Raw.Set(cacheKey, result, TimeSpan.FromMinutes(10));
+        }
+
+        return Ok(result);
     }
 
     [AllowAnonymous, HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id)
     {
+        var cacheKey = $"post_detail_{id}";
+        var isAnonymous = User.Identity?.IsAuthenticated != true;
+
+        if (isAnonymous && appCache.Raw.TryGetValue(cacheKey, out object? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
         var p = await WithDetails().FirstOrDefaultAsync(x => x.Id == id);
         if (p is null) return NotFound();
         var mine = User.Identity?.IsAuthenticated == true && (User.UserId() == p.AuthorId || User.IsInRole("Admin"));
-        return p.Status != "Published" && !mine ? NotFound(new { message = "That article is not available." }) : Ok(ApiMapper.Post(p, true));
+        if (p.Status != "Published" && !mine)
+            return NotFound(new { message = "That article is not available." });
+
+        var mapped = ApiMapper.Post(p, true);
+        if (p.Status == "Published")
+        {
+            appCache.Raw.Set(cacheKey, mapped, TimeSpan.FromMinutes(10));
+        }
+        return Ok(mapped);
     }
 
     [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpGet("mine")]
@@ -158,6 +199,7 @@ public class PostsController(AppDbContext db) : ControllerBase
 
         db.Posts.Add(post);
         await db.SaveChangesAsync();
+        appCache.InvalidatePostDetail(post.Id);
 
         var detail = await WithDetails().SingleAsync(x => x.Id == post.Id);
         return Ok(new { message = admin ? "Article published." : "Article saved.", post = ApiMapper.Post(detail, true) });
@@ -194,6 +236,7 @@ public class PostsController(AppDbContext db) : ControllerBase
         await SetTaxonomy(p, request);
         SetImages(p, request);
         await db.SaveChangesAsync();
+        appCache.InvalidatePostDetail(id);
         return Ok(new { message = User.IsInRole("Admin") ? "Article updated." : "Changes submitted for review." });
     }
 
@@ -208,6 +251,7 @@ public class PostsController(AppDbContext db) : ControllerBase
             return BadRequest(new { message = "A cover image is required to submit." });
         p.Status = "PendingReview"; p.RejectionReason = null; p.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+        appCache.InvalidatePostDetail(id);
         return Ok(new { message = "Submitted for review." });
     }
 
@@ -218,6 +262,7 @@ public class PostsController(AppDbContext db) : ControllerBase
         if (p is null) return Forbid();
         db.Posts.Remove(p);
         await db.SaveChangesAsync();
+        appCache.InvalidatePostDetail(id);
         return Ok(new { message = "Article deleted." });
     }
 

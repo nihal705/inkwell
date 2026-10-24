@@ -1,15 +1,17 @@
 using InkWell.Api.Data;
 using InkWell.Api.DTOs;
 using InkWell.Api.Models;
+using InkWell.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text.RegularExpressions;
 
 namespace InkWell.Api.Controllers;
 
 [ApiController, Route("api/series")]
-public class SeriesController(AppDbContext db) : ControllerBase
+public class SeriesController(AppDbContext db, AppCache appCache) : ControllerBase
 {
     IQueryable<Series> WithDetails() => db.Series
         .Include(x => x.Author)
@@ -21,17 +23,31 @@ public class SeriesController(AppDbContext db) : ControllerBase
     [AllowAnonymous, HttpGet]
     public async Task<IActionResult> List()
     {
+        const string key = "series_list_public";
+        if (appCache.Raw.TryGetValue(key, out object? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
         var seriesList = await WithDetails()
             .OrderByDescending(x => x.UpdatedAt)
             .ToListAsync();
 
-        return Ok(seriesList.Select(s => ApiMapper.Series(s, true)));
+        var result = seriesList.Select(s => ApiMapper.Series(s, true)).ToList();
+        appCache.Raw.Set(key, result, TimeSpan.FromMinutes(10));
+        return Ok(result);
     }
 
     [AllowAnonymous, HttpGet("{slug}")]
     public async Task<IActionResult> GetBySlug(string slug)
     {
         var lowerSlug = slug.ToLowerInvariant().Trim();
+        var key = $"series_slug_{lowerSlug}";
+        if (appCache.Raw.TryGetValue(key, out object? cached) && cached != null)
+        {
+            return Ok(cached);
+        }
+
         var series = await WithDetails()
             .FirstOrDefaultAsync(x => x.Slug == lowerSlug);
 
@@ -41,7 +57,10 @@ public class SeriesController(AppDbContext db) : ControllerBase
         }
 
         if (series == null) return NotFound(new { message = "Series not found." });
-        return Ok(ApiMapper.Series(series, true));
+
+        var result = ApiMapper.Series(series, true);
+        appCache.Raw.Set(key, result, TimeSpan.FromMinutes(10));
+        return Ok(result);
     }
 
     [Authorize(Roles = "Admin,Featured Columnist,Contributing Writer,Senior Editor,Staff Editor,Editor"), HttpPost]
@@ -73,6 +92,8 @@ public class SeriesController(AppDbContext db) : ControllerBase
         db.Series.Add(series);
         await db.SaveChangesAsync();
 
+        appCache.InvalidateSeries(series.Slug);
+
         var created = await WithDetails().SingleAsync(x => x.Id == series.Id);
         return Ok(new { message = "Series created successfully.", series = ApiMapper.Series(created, false) });
     }
@@ -87,12 +108,17 @@ public class SeriesController(AppDbContext db) : ControllerBase
         if (series.AuthorId != User.UserId() && !User.IsInRole("Admin"))
             return Forbid();
 
+        var oldSlug = series.Slug;
         series.Title = dto.Title.Trim();
         series.Description = dto.Description?.Trim();
         series.CoverImageUrl = dto.CoverImageUrl?.Trim();
         series.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync();
+
+        appCache.InvalidateSeries(oldSlug);
+        appCache.InvalidateSeries(series.Slug);
+
         var updated = await WithDetails().SingleAsync(x => x.Id == series.Id);
         return Ok(new { message = "Series updated successfully.", series = ApiMapper.Series(updated, true) });
     }
@@ -106,6 +132,7 @@ public class SeriesController(AppDbContext db) : ControllerBase
         if (series.AuthorId != User.UserId() && !User.IsInRole("Admin"))
             return Forbid();
 
+        var slug = series.Slug;
         foreach (var post in series.Posts)
         {
             post.SeriesId = null;
@@ -114,6 +141,9 @@ public class SeriesController(AppDbContext db) : ControllerBase
 
         db.Series.Remove(series);
         await db.SaveChangesAsync();
+
+        appCache.InvalidateSeries(slug);
+
         return Ok(new { message = "Series deleted successfully." });
     }
 }

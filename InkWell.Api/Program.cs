@@ -69,9 +69,15 @@ builder.Services.AddAuthentication(options =>
     NameClaimType = System.Security.Claims.ClaimTypes.Name
 });
 builder.Services.AddAuthorization();
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<AppCache>();
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+});
 builder.Services.AddCors(options => options.AddPolicy("AllowFrontend", policy => policy
-    .SetIsOriginAllowed(origin => origin == "http://localhost:5000" || origin == "http://localhost:5173" || new Uri(origin).Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase))
-    .AllowAnyHeader().AllowAnyMethod()));
+    .SetIsOriginAllowed(_ => true)
+    .AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
 builder.Services.AddHttpClient();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -79,8 +85,23 @@ builder.Services.AddOpenApi();
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrWhiteSpace(port)) builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 var app = builder.Build();
+
+app.UseResponseCompression();
 app.UseDefaultFiles();
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        if (ctx.File.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers.Append("Cache-Control", "no-cache, no-store, must-revalidate");
+        }
+        else
+        {
+            ctx.Context.Response.Headers.Append("Cache-Control", "public, max-age=86400");
+        }
+    }
+});
 app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
