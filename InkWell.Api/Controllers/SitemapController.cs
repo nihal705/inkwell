@@ -11,7 +11,7 @@ public class SitemapController(AppDbContext db) : ControllerBase
     [HttpGet("/sitemap.xml")]
     public async Task<IActionResult> GetSitemap()
     {
-        var baseUrl = "https://inkwell-3m7y.onrender.com";
+        var baseUrl = "https://inkwell-magazine.vercel.app";
         var posts = await db.Posts.Where(x => x.Status == "Published").ToListAsync();
 
         var xml = new StringBuilder();
