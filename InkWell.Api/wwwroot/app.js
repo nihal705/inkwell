@@ -361,87 +361,46 @@ function markdown(text) {
     .join("");
 }
 
-// ==================== LOCAL FALLBACK SUMMARIZER ====================
-function generateSummary(content) {
+// ==================== EDITORIAL SUMMARY GENERATOR ====================
+function generateSummary(content, title = "") {
+  if (!content) return "A compelling long-form exploration on InkWell.";
   let text = content
     .replace(/!\[.*?\]\(.*?\)/g, "")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/^#+\s+.*$/gm, "")
+    .replace(/^>\s+.*$/gm, "")
     .replace(/^\s*[-*+]\s+/gm, "")
-    .replace(/[#*_>`]/g, "")
-    .replace(/\n+/g, " ")
-    .trim();
+    .replace(/[#*_`]/g, "")
+    .replace(/\r\n|\r/g, "\n");
 
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-  if (sentences.length <= 4) return sentences.join(" ");
+  if (title) {
+    const escTitle = title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    text = text.replace(new RegExp(`^\\s*${escTitle}\\s*`, "i"), "");
+  }
 
-  const stopWords = new Set([
-    "the",
-    "and",
-    "a",
-    "to",
-    "of",
-    "in",
-    "i",
-    "is",
-    "that",
-    "it",
-    "on",
-    "you",
-    "this",
-    "for",
-    "but",
-    "with",
-    "are",
-    "have",
-    "be",
-    "at",
-    "or",
-    "as",
-    "was",
-    "so",
-    "if",
-    "out",
-    "not",
-    "we",
-    "they",
-    "he",
-    "she",
-    "my",
-    "our",
-  ]);
-  const wordFreq = {};
-  const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+  const paragraphs = text
+    .split(/\n\s*\n/)
+    .map((p) => p.replace(/\s+/g, " ").trim())
+    .filter(
+      (p) =>
+        p.length > 50 &&
+        !p.startsWith("!") &&
+        !p.startsWith("Photo") &&
+        !p.startsWith("Image") &&
+        !p.startsWith("Figure"),
+    );
 
-  words.forEach((word) => {
-    if (!stopWords.has(word) && word.length > 2) {
-      wordFreq[word] = (wordFreq[word] || 0) + 1;
-    }
-  });
+  if (paragraphs.length === 0) return "A compelling long-form exploration on InkWell.";
 
-  const sentenceScores = sentences.map((sentence, index) => {
-    const sentenceWords = sentence.toLowerCase().match(/\b\w+\b/g) || [];
-    let score = 0;
-    sentenceWords.forEach((word) => {
-      if (wordFreq[word]) score += wordFreq[word];
-    });
-    score = score / (sentenceWords.length || 1);
-    if (index < 2) score *= 1.3;
-    return { sentence: sentence.trim(), score, index };
-  });
+  const hookText = paragraphs.slice(0, 2).join(" ");
+  const sentences = hookText.match(/[^.!?]+[.!?]+/g) || [paragraphs[0]];
 
-  const sentenceCount = Math.min(
-    8,
-    Math.max(3, Math.ceil(sentences.length * 0.3)),
-  );
+  const cleanSentences = sentences
+    .map((s) => s.trim())
+    .filter((s) => s.length > 25 && !s.includes("http"));
 
-  const topSentences = sentenceScores
-    .sort((a, b) => b.score - a.score)
-    .slice(0, sentenceCount)
-    .sort((a, b) => a.index - b.index)
-    .map((s) => s.sentence);
-
-  return topSentences.join(" ");
+  const summary = cleanSentences.slice(0, 3).join(" ");
+  return summary || paragraphs[0];
 }
 
 // ==================== HOUSE ADS ====================
@@ -655,7 +614,7 @@ function openSummaryModal(title, author, summary) {
           <p class="summary-text">${esc(summary)}</p>
           <div class="summary-footer">
             <span class="summary-author">— ${esc(author)}</span>
-            <a href="https://inkwell-3m7y.onrender.com" target="_blank" class="summary-url">inkwell-3m7y.onrender.com</a>
+            <a href="${location.origin}" target="_blank" class="summary-url">${location.host}</a>
             <span class="summary-brand">✦ InkWell</span>
           </div>
         </div>
@@ -1371,39 +1330,13 @@ async function postPage(id) {
 
     // Summary
     $$(".summary-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const originalText = btn.innerHTML;
-        btn.innerHTML = "✨ Generating...";
-        btn.disabled = true;
-        btn.style.opacity = "0.7";
-        try {
-          const response = await api(`/api/posts/${p.id}/summarize`, {
-            method: "POST",
-          });
-          openSummaryModal(
-            p.title,
-            p.author.displayName || p.author.username,
-            response.summary,
-          );
-        } catch (err) {
-          toast("AI unavailable. Generating local summary...", "error");
-          let cleanContent = p.content;
-          const firstLine = cleanContent.split("\n")[0];
-          if (
-            firstLine.includes(p.title) ||
-            firstLine.length < p.title.length + 5
-          )
-            cleanContent = cleanContent.substring(firstLine.length).trim();
-          openSummaryModal(
-            p.title,
-            p.author.displayName || p.author.username,
-            generateSummary(cleanContent),
-          );
-        } finally {
-          btn.innerHTML = originalText;
-          btn.disabled = false;
-          btn.style.opacity = "1";
-        }
+      btn.addEventListener("click", () => {
+        const summary = generateSummary(p.content, p.title);
+        openSummaryModal(
+          p.title,
+          p.author.displayName || p.author.username,
+          summary,
+        );
       });
     });
 
