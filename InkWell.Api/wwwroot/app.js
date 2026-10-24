@@ -1241,13 +1241,13 @@ async function postPage(id) {
             <span class="nav-dir">← Previous Chapter</span>
             <span class="nav-title">Part ${prevPart.seriesOrder}: ${esc(prevPart.title)}</span>
           </a>
-        ` : `<div></div>`}
+        ` : ""}
         ${nextPart ? `
           <a href="/post/${nextPart.id}" class="series-nav-btn next">
             <span class="nav-dir">Next Chapter →</span>
             <span class="nav-title">Part ${nextPart.seriesOrder}: ${esc(nextPart.title)}</span>
           </a>
-        ` : `<div></div>`}
+        ` : ""}
       </div>
     ` : "";
 
