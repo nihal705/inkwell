@@ -2,6 +2,41 @@ const $ = (s, e = document) => e.querySelector(s);
 const $$ = (s, e = document) => [...e.querySelectorAll(s)];
 const app = $("#app");
 
+const setHtml = (target, html) => {
+  const el = typeof target === "string" ? $(target) : target;
+  if (el) el.innerHTML = html;
+  return el;
+};
+const setText = (target, text) => {
+  const el = typeof target === "string" ? $(target) : target;
+  if (el) el.textContent = text;
+  return el;
+};
+
+function showProgress() {
+  let bar = $("#nav-loader");
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "nav-loader";
+    bar.className = "nav-loader";
+    document.body.appendChild(bar);
+  }
+  bar.classList.remove("done");
+  void bar.offsetWidth;
+  bar.classList.add("loading");
+}
+
+function hideProgress() {
+  const bar = $("#nav-loader");
+  if (bar) {
+    bar.classList.remove("loading");
+    bar.classList.add("done");
+    setTimeout(() => {
+      if (bar.classList.contains("done")) bar.classList.remove("done");
+    }, 280);
+  }
+}
+
 // ==================== LOCAL STORAGE (BOOKMARKS) ====================
 const store = {
   get(key, fallback) {
@@ -264,8 +299,16 @@ const state = {
   theme:
     localStorage.getItem("inkwell_theme") ||
     (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"),
+  navId: 0,
 };
 document.documentElement.dataset.theme = state.theme;
+
+function startNav() {
+  return ++state.navId;
+}
+function isCurrentNav(id) {
+  return id === state.navId;
+}
 
 function clearShell() {
   app.innerHTML = "";
@@ -676,6 +719,7 @@ function openSummaryModal(title, author, summary) {
 
 // ==================== HOME ====================
 async function home() {
+  const navId = startNav();
   updateMeta(
     "InkWell — Where readers become writers",
     "A digital magazine for readers with curiosity and writers with something worth saying.",
@@ -720,6 +764,7 @@ async function home() {
       api("/api/posts"),
       api("/api/featured").catch(() => []),
     ]);
+    if (!isCurrentNav(navId)) return;
     state.categories = cats;
 
     // Render Admin Curated Spotlight if configured
@@ -727,7 +772,7 @@ async function home() {
       const spotlightEl = $("#spotlight-section");
       if (spotlightEl) {
         spotlightEl.style.display = "block";
-        spotlightEl.innerHTML = `
+        setHtml(spotlightEl, `
           <div class="spotlight-header">
             <div>
               <div class="eyebrow">Curated Selection</div>
@@ -738,30 +783,31 @@ async function home() {
           <div class="spotlight-grid">
             ${featured.map(renderSpotlightCard).join("")}
           </div>
-        `;
+        `);
       }
     }
 
-    $("#category-bar").innerHTML =
-      `<a class="chip active" href="/articles">All (${data.total})</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
-    $("#posts").innerHTML = data.items.length
+    setHtml("#category-bar", `<a class="chip active" href="/articles">All (${data.total})</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`);
+    setHtml("#posts", data.items.length
       ? data.items.map(card).join("")
-      : empty("No articles match that search.", "Clear filters", "/");
+      : empty("No articles match that search.", "Clear filters", "/"));
     if (data.total > 6 || data.total > data.items.length) {
-      $("#home-more").innerHTML = `<a class="button secondary" href="/articles">Browse all articles (${data.total}) <span>→</span></a>`;
+      setHtml("#home-more", `<a class="button secondary" href="/articles">Browse all articles (${data.total}) <span>→</span></a>`);
     }
   } catch (e) {
-    $("#posts").innerHTML = empty(
+    if (!isCurrentNav(navId)) return;
+    setHtml("#posts", empty(
       "The library is waking up.",
       "Try again",
       "/",
-    );
+    ));
   }
   $("#open-search")?.addEventListener("click", searchModal);
 }
 
 // ==================== ALL ARTICLES ====================
 async function articlesPage(page = 1) {
+  const navId = startNav();
   updateMeta(
     "All Articles — InkWell",
     "Explore every published story, essay, and thought on InkWell.",
@@ -785,12 +831,13 @@ async function articlesPage(page = 1) {
       api("/api/categories"),
       api(`/api/posts?page=${page}`),
     ]);
+    if (!isCurrentNav(navId)) return;
     state.categories = cats;
-    $("#category-bar").innerHTML = `<a class="chip active" href="/articles">All (${data.total})</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`;
+    setHtml("#category-bar", `<a class="chip active" href="/articles">All (${data.total})</a>${cats.map((c) => `<a class="chip" href="/category/${encodeURIComponent(c.name)}">${esc(c.name)}</a>`).join("")}`);
 
-    $("#posts").innerHTML = data.items.length
+    setHtml("#posts", data.items.length
       ? data.items.map(card).join("")
-      : empty("No articles published yet.", "Start writing", "/editor/new");
+      : empty("No articles published yet.", "Start writing", "/editor/new"));
 
     const totalPages = Math.ceil(data.total / (data.pageSize || 9));
     if (totalPages > 1) {
@@ -802,7 +849,7 @@ async function articlesPage(page = 1) {
       if (page < totalPages) {
         pagHtml += `<button class="button small secondary" id="next-page">Next →</button>`;
       }
-      $("#pagination").innerHTML = pagHtml;
+      setHtml("#pagination", pagHtml);
 
       $("#prev-page")?.addEventListener("click", () => {
         window.history.pushState(null, "", `/articles?page=${page - 1}`);
@@ -816,12 +863,14 @@ async function articlesPage(page = 1) {
       });
     }
   } catch (e) {
-    $("#posts").innerHTML = empty("Could not load articles.", "Try again", "/articles");
+    if (!isCurrentNav(navId)) return;
+    setHtml("#posts", empty("Could not load articles.", "Try again", "/articles"));
   }
 }
 
 // ==================== SERIES PAGES ====================
 async function seriesListPage() {
+  const navId = startNav();
   updateMeta(
     "Series & Anthologies — InkWell",
     "Deep-dive multi-part investigative series and long-form anthologies.",
@@ -841,14 +890,15 @@ async function seriesListPage() {
 
   try {
     const list = await api("/api/series");
+    if (!isCurrentNav(navId)) return;
     const container = $("#series-grid");
     if (!container) return;
     if (!list || list.length === 0) {
-      container.innerHTML = empty("No series published yet.", "Back home", "/");
+      setHtml(container, empty("No series published yet.", "Back home", "/"));
       return;
     }
 
-    container.innerHTML = list.map((s) => `
+    setHtml(container, list.map((s) => `
       <a class="series-card fade-in-up" href="/series/${esc(s.slug)}">
         <div class="series-card-cover">
           <span class="series-chapter-badge">${s.partsCount} ${s.partsCount === 1 ? 'Chapter' : 'Chapters'}</span>
@@ -866,18 +916,21 @@ async function seriesListPage() {
           </div>
         </div>
       </a>
-    `).join("");
+    `).join(""));
   } catch (err) {
-    $("#series-grid").innerHTML = empty("Failed to load series.", "Retry", "/series");
+    if (!isCurrentNav(navId)) return;
+    setHtml("#series-grid", empty("Failed to load series.", "Retry", "/series"));
   }
 }
 
 async function seriesDetailPage(slug) {
+  const navId = startNav();
   if (!getCached(`/api/series/${encodeURIComponent(slug)}`)) {
     shell(`<div class="article-skeleton wrap"></div>`);
   }
   try {
     const s = await api(`/api/series/${encodeURIComponent(slug)}`);
+    if (!isCurrentNav(navId)) return;
     updateMeta(
       `${s.title} (Series) — InkWell`,
       s.description || `A multi-part series by ${s.author?.displayName || s.author?.username}`,
@@ -963,6 +1016,7 @@ async function seriesDetailPage(slug) {
       </div>
     `);
   } catch (err) {
+    if (!isCurrentNav(navId)) return;
     shell(`<section class="wrap page-head">${empty("Series not found.", "Browse all series", "/series")}</section>`);
   }
 }
@@ -1021,57 +1075,64 @@ function contactPage() {
 
 // ==================== CATEGORIES & TAGS ====================
 async function categoriesPage() {
+  const navId = startNav();
   updateMeta("Categories — InkWell", "Explore all topics on InkWell.");
   shell(
     `<section class="page-head wrap"><div class="eyebrow">Explore InkWell</div><h1>All categories</h1><p>Find stories by the questions they explore.</p></section><section class="wrap category-grid" id="cat-grid"><div class="skeleton"></div></section>`,
   );
   try {
     const cats = await api("/api/categories");
-    $("#cat-grid").innerHTML = cats.length
+    if (!isCurrentNav(navId)) return;
+    setHtml("#cat-grid", cats.length
       ? cats
           .map(
             (c) =>
               `<a class="category-card" href="/category/${encodeURIComponent(c.name)}"><b>${esc(c.name)}</b><span>${c.postCount || 0} articles</span></a>`,
           )
           .join("")
-      : empty("No categories yet.", "Back home", "/");
+      : empty("No categories yet.", "Back home", "/"));
   } catch (e) {
-    $("#cat-grid").innerHTML = empty(
+    if (!isCurrentNav(navId)) return;
+    setHtml("#cat-grid", empty(
       "Could not load categories.",
       "Try again",
       "/categories",
-    );
+    ));
   }
 }
 
 async function category(name) {
+  const navId = startNav();
   updateMeta(`${name} — InkWell`, `articles in ${name}.`);
   shell(
     `<section class="page-head wrap"><div class="eyebrow">InkWell category</div><h1>${esc(name)}</h1><p>Stories gathered around one good question.</p></section><section class="wrap post-grid" id="posts"></section>`,
   );
   const d = await api(`/api/posts?category=${encodeURIComponent(name)}`);
-  $("#posts").innerHTML = d.items.length
+  if (!isCurrentNav(navId)) return;
+  setHtml("#posts", d.items.length
     ? d.items.map(card).join("")
     : empty(
         "No published articles in this category yet.",
         "Explore all articles",
         "/",
-      );
+      ));
 }
 
 async function tagPage(name) {
+  const navId = startNav();
   updateMeta(`#${name} — InkWell`, `article tagged with #${name}.`);
   shell(
     `<section class="page-head wrap"><div class="eyebrow">Keyword</div><h1>#${esc(name)}</h1><p>All articles tagged with ${esc(name)}.</p></section><section class="wrap post-grid" id="posts"><div class="skeleton"></div></section>`,
   );
   const d = await api(`/api/posts?tag=${encodeURIComponent(name)}`);
-  $("#posts").innerHTML = d.items.length
+  if (!isCurrentNav(navId)) return;
+  setHtml("#posts", d.items.length
     ? d.items.map(card).join("")
     : empty(
         "No published articles with this tag yet.",
         "Explore all articles",
         "/",
-      );
+      ));
 }
 
 // ==================== LIBRARY ====================
@@ -1117,11 +1178,13 @@ function libraryPage() {
 
 // ==================== POST PAGE ====================
 async function postPage(id) {
+  const navId = startNav();
   if (!getCached(`/api/posts/${id}`)) {
     shell(`<div class="article-skeleton wrap"></div>`);
   }
   try {
     const p = await api(`/api/posts/${id}`);
+    if (!isCurrentNav(navId)) return;
     updateMeta(
       `${p.title} — InkWell`,
       p.excerpt || "Read this article on InkWell.",
@@ -1578,15 +1641,16 @@ async function postPage(id) {
     );
     try {
       const list = await api("/api/posts?page=1");
+      if (!isCurrentNav(navId)) return;
       const others = list.items.filter((x) => x.id !== p.id).slice(0, 4);
-      $("#related").innerHTML = others.length
+      setHtml("#related", others.length
         ? others
             .map(
               (r) =>
                 `<a class="related-item" href="/post/${r.id}"><b>${esc(r.title)}</b><small>${esc(r.author.displayName || r.author.username)} · ${r.readingTimeMinutes} min</small></a>`,
             )
             .join("")
-        : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>';
+        : '<p style="color:var(--muted);font-size:13px">No other articles yet.</p>');
     } catch {}
 
     // Series Floating Up-Next Pill
@@ -2001,8 +2065,7 @@ function profile() {
   $("#pick-image")?.addEventListener("click", () => fileInput.click());
   $("#remove-image")?.addEventListener("click", () => {
     $("[name=image]").value = "";
-    $("#avatar-preview").innerHTML =
-      `<span>${(dn[0] || "U").toUpperCase()}</span>`;
+    setHtml("#avatar-preview", `<span>${(dn[0] || "U").toUpperCase()}</span>`);
   });
   fileInput?.addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
@@ -2011,7 +2074,7 @@ function profile() {
       toast("Uploading…");
       const url = await uploadImage(file);
       $("[name=image]").value = url;
-      $("#avatar-preview").innerHTML = `<img src="${esc(url)}" alt="">`;
+      setHtml("#avatar-preview", `<img src="${esc(url)}" alt="">`);
     } catch (err) {
       toast(err.message, "error");
     }
@@ -2044,11 +2107,13 @@ function profile() {
 }
 
 async function author(id) {
+  const navId = startNav();
   if (!getCached(`/api/authors/${id}`)) {
     shell(`<div class="article-skeleton wrap"></div>`);
   }
   try {
     const d = await api(`/api/authors/${id}`);
+    if (!isCurrentNav(navId)) return;
     const u = d.author;
     const name = u.displayName || u.username;
     const roleTitle = getEditorialRole(u, "both");
@@ -2132,23 +2197,25 @@ async function editor() {
     navigate("/apply");
     return;
   }
+  const navId = startNav();
   updateMeta("Dashboard — InkWell", "Your writing desk.");
   shell(
     `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Your writing desk</div><h1>Hello, ${esc(state.user.displayName || state.user.username)}.</h1></div><a class="button" href="/editor/new">New article +</a></div><div class="stats" id="editor-stats"></div><div class="table-wrap"><div class="section-heading"><h2>Your articles</h2></div><div id="my-posts"></div></div></section>`,
   );
   const posts = await api("/api/posts/mine");
+  if (!isCurrentNav(navId)) return;
   const counts = ["Draft", "PendingReview", "Published", "Rejected"].map(
     (k) => [k, posts.filter((x) => x.status === k).length],
   );
-  $("#editor-stats").innerHTML = counts
+  setHtml("#editor-stats", counts
     .map(
       ([k, v]) =>
         `<div><b>${v}</b><span>${k === "PendingReview" ? "In review" : k + "s"}</span></div>`,
     )
-    .join("");
-  $("#my-posts").innerHTML = posts.length
+    .join(""));
+  setHtml("#my-posts", posts.length
     ? `<table><thead><tr><th>Story</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${posts.map((p) => `<tr><td><b>${esc(p.title)}</b>${p.rejectionReason ? `<small class="reject">Returned: ${esc(p.rejectionReason)}</small>` : ""}</td><td><span class="status ${p.status.toLowerCase()}">● ${p.status.replace("Review", " review")}</span></td><td>${date(p.updatedAt)}</td><td><a href="/editor/edit/${p.id}">Edit →</a> <button class="link-button delete-own-post" data-id="${p.id}" style="color:var(--danger);margin-left:8px">Delete</button></td></tr>`).join("")}</tbody></table>`
-    : empty("Start a first draft.", "Write article", "/editor/new");
+    : empty("Start a first draft.", "Write article", "/editor/new"));
   $$(".delete-own-post").forEach(
     (b) =>
       (b.onclick = async () => {
@@ -2318,7 +2385,7 @@ async function composer(id) {
       toast("Uploading…");
       const url = await uploadImage(file);
       fields.image.value = url;
-      $("#cover-preview").innerHTML = `<img src="${esc(url)}" alt="">`;
+      setHtml("#cover-preview", `<img src="${esc(url)}" alt="">`);
     } catch (err) {
       toast(err.message, "error");
     }
@@ -2463,6 +2530,7 @@ async function composer(id) {
 
 async function admin() {
   if (!guard(["Admin"])) return;
+  const navId = startNav();
   updateMeta("Admin Panel — InkWell", "Editorial control room.");
   shell(
     `<section class="wrap dashboard"><div class="dashboard-head"><div><div class="eyebrow">Editorial control room</div><h1>Good morning, editor.</h1></div></div><div class="stats" id="admin-stats"></div><div class="admin-tabs"><button class="active" data-tab="posts">Pending posts</button><button data-tab="spotlight">Homepage Spotlight ✦</button><button data-tab="series">Series Manager</button><button data-tab="applications">Editor applications</button><button data-tab="users">Community</button></div><div id="admin-content" class="table-wrap"></div></section>`,
@@ -2473,14 +2541,15 @@ async function admin() {
     api("/api/admin/applications"),
     api("/api/admin/users"),
   ]);
-  $("#admin-stats").innerHTML = [
+  if (!isCurrentNav(navId)) return;
+  setHtml("#admin-stats", [
     [stats.pendingPosts, "Articles to review"],
     [stats.pendingApplications, "Applications"],
     [stats.published, "Published"],
     [stats.editors, "Editors"],
   ]
     .map((x) => `<div><b>${x[0]}</b><span>${x[1]}</span></div>`)
-    .join("");
+    .join(""));
 
   const renderTab = async (t) => {
     const out = $("#admin-content");
@@ -3101,14 +3170,14 @@ function searchModal() {
       const d = await api(
         `/api/posts?search=${encodeURIComponent(input.value)}`,
       );
-      $(".search-results", modal).innerHTML = d.items.length
+      setHtml($(".search-results", modal), d.items.length
         ? d.items
             .map(
               (p) =>
                 `<a href="/post/${p.id}" class="search-item">${esc(p.title)}<small>${esc(p.author.displayName || p.author.username)}</small></a>`,
             )
             .join("")
-        : "No results.";
+        : "No results.");
     }, 240);
   };
 }
@@ -3118,6 +3187,7 @@ async function render() {
   const route = location.pathname;
   window.scrollTo({ top: 0, behavior: "instant" });
   $$(".series-up-next-pill").forEach((el) => el.remove());
+  showProgress();
   try {
     if (route === "/") await home();
     else if (route === "/articles" || route.startsWith("/articles")) {
@@ -3154,6 +3224,8 @@ async function render() {
     shell(
       `<section class="wrap page-head">${empty(e.message, "Back home", "/")}</section>`,
     );
+  } finally {
+    hideProgress();
   }
 }
 
