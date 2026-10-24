@@ -3205,6 +3205,74 @@ mark.inkwell-highlight:hover {
 }
 
 /* ==========================================================================
+   MOBILE RESPONSIVE: SERIES POST PAGE FIX
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* 1. Constrain series pill at the top of article so it never exceeds viewport */
+  .series-badge-row {
+    max-width: 100%;
+    margin-bottom: 12px;
+  }
+  .series-pill {
+    max-width: 100%;
+    padding: 5px 12px;
+    font-size: 0.76rem;
+    gap: 6px;
+    box-sizing: border-box;
+  }
+  .series-title-text {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  /* 2. Floating Up-Next Pill (Prevent horizontal expansion/overflow) */
+  .series-up-next-pill {
+    bottom: 16px !important;
+    right: 12px !important;
+    left: 12px !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    padding: 10px 14px !important;
+    gap: 10px !important;
+    box-sizing: border-box !important;
+  }
+  .series-up-next-pill .up-next-title {
+    max-width: calc(100vw - 160px) !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* 3. Series Nav Footer (Stack cleanly on mobile) */
+  .series-nav-footer {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    margin: 24px 0 !important;
+    padding-top: 16px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .series-nav-btn {
+    padding: 12px 14px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .series-nav-btn .nav-title {
+    font-size: 0.92rem !important;
+  }
+
+  /* 4. Series Roadmap Card in Sidebar */
+  .series-roadmap-card {
+    padding: 14px !important;
+    margin-bottom: 16px !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* ==========================================================================
    ADMIN CONTROL ROOM: SPOTLIGHT DRAG & DROP & SERIES MANAGER
    ========================================================================== */
 .admin-spotlight-wrapper {
