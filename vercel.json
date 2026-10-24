@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://inkwell-3m7y.onrender.com/api/:path*"
+      "destination": "inkwell-production-4914.up.railway.app/api/:path*"
     },
     {
       "source": "/(.*)",
