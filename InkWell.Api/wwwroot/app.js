@@ -450,6 +450,13 @@ function shell(content) {
     main.innerHTML = content;
     $(".nav-links")?.classList.remove("open");
     updateNavActive();
+    const u = state.user;
+    const navAvatar = $("header .avatar");
+    if (navAvatar && u) {
+      navAvatar.innerHTML = u.profilePictureUrl
+        ? `<img src="${esc(u.profilePictureUrl)}" alt="">`
+        : initials(u);
+    }
     return;
   }
   const u = state.user;
@@ -3248,6 +3255,25 @@ async function render() {
   }
 }
 
+async function syncUser() {
+  if (!state.token) return;
+  try {
+    const d = await api("/api/auth/refresh", { method: "POST" });
+    if (d && d.user) {
+      state.user = d.user;
+      if (d.token) state.token = d.token;
+      localStorage.setItem("inkwell_user", JSON.stringify(d.user));
+      if (d.token) localStorage.setItem("inkwell_token", d.token);
+      const navAvatar = $("header .avatar");
+      if (navAvatar) {
+        navAvatar.innerHTML = d.user.profilePictureUrl
+          ? `<img src="${esc(d.user.profilePictureUrl)}" alt="">`
+          : initials(d.user);
+      }
+    }
+  } catch {}
+}
+
 addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
     e.preventDefault();
@@ -3255,4 +3281,5 @@ addEventListener("keydown", (e) => {
   }
 });
 render();
+syncUser();
 ensureCloudinaryConfig();
