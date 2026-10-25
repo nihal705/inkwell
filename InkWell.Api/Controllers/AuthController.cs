@@ -13,10 +13,10 @@ namespace InkWell.Api.Controllers;
 public class AuthController(AppDbContext db, IJwtService jwt, IPasswordHasher hasher, IEmailService email) : ControllerBase
 {
     // ---------- OTP rate limiting ----------
-    // In-memory limiter — per email, max 3 OTP requests / hour
+    // In-memory limiter — per email, max 5 OTP requests / hour
     private static readonly ConcurrentDictionary<string, List<DateTime>> OtpRequestLog = new();
     private static readonly TimeSpan OtpWindow = TimeSpan.FromHours(1);
-    private const int MaxOtpRequestsPerWindow = 3;
+    private const int MaxOtpRequestsPerWindow = 5;
 
     private static bool AllowOtpRequest(string email)
     {
@@ -220,7 +220,7 @@ public class AuthController(AppDbContext db, IJwtService jwt, IPasswordHasher ha
 
         // Rate-limit regardless of whether email exists (prevents enumeration + abuse)
         if (!AllowOtpRequest(emailAddr))
-            return StatusCode(429, new { message = "Too many reset requests. Try again in an hour." });
+            return StatusCode(429, new { message = "Too many reset requests (maximum 5 attempts reached). Please try again in an hour." });
 
         var user = await db.Users.FirstOrDefaultAsync(x => x.Email == emailAddr);
 
