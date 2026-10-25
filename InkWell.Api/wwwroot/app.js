@@ -1992,7 +1992,30 @@ function profile() {
   const cur = u.profilePictureUrl || "";
   const dn = u.displayName || u.username || "";
   shell(
-    `<section class="wrap profile-page"><div class="page-head" style="padding-bottom:20px"><div class="eyebrow">Identity</div><h1>Profile</h1></div><form id="profile" class="profile-form"><div class="profile-grid"><aside class="profile-avatar-col"><div class="profile-avatar" id="avatar-preview">${cur ? `<img src="${esc(cur)}" alt="">` : `<span>${(dn[0] || "U").toUpperCase()}</span>`}</div><input type="file" accept="image/*" id="profile-file" style="display:none"><input type="hidden" name="image" value="${esc(cur)}"><div class="avatar-actions"><button type="button" class="button small secondary" id="pick-image">Upload</button>${cur ? `<button type="button" class="button small danger" id="remove-image">Remove</button>` : ""}</div></aside><div class="profile-fields"><label>Display name<input name="displayName" value="${esc(dn)}"></label><label>Profession<input name="profession" value="${esc(u.profession || "")}"></label><label>Location<input name="location" value="${esc(u.location || "")}"></label><label>Website<input name="website" value="${esc(u.website || "")}"></label><label>Twitter / X<input name="twitterHandle" value="${esc(u.twitterHandle || "")}"></label><label>LinkedIn<input name="linkedinUrl" value="${esc(u.linkedInUrl || "")}"></label><label>Bio<textarea name="bio">${esc(u.bio || "")}</textarea></label><div class="form-actions"><button class="button" type="submit">Save</button><a class="button secondary" href="/author/${u.id}">View public</a></div></div></div></form></section>`,
+    `<section class="wrap profile-page"><div class="page-head" style="padding-bottom:20px"><div class="eyebrow">Identity</div><h1>Profile</h1></div><form id="profile" class="profile-form"><div class="profile-grid"><aside class="profile-avatar-col"><div class="profile-avatar" id="avatar-preview">${cur ? `<img src="${esc(cur)}" alt="">` : `<span>${(dn[0] || "U").toUpperCase()}</span>`}</div><input type="file" accept="image/*" id="profile-file" style="display:none"><input type="hidden" name="image" value="${esc(cur)}"><div class="avatar-actions"><button type="button" class="button small secondary" id="pick-image">Upload</button>${cur ? `<button type="button" class="button small danger" id="remove-image">Remove</button>` : ""}</div></aside><div class="profile-fields"><label>Display name<input name="displayName" value="${esc(dn)}"></label><label>Profession<input name="profession" value="${esc(u.profession || "")}"></label><label>Location<input name="location" value="${esc(u.location || "")}"></label><label>Website<input name="website" value="${esc(u.website || "")}"></label><label>Twitter / X<input name="twitterHandle" value="${esc(u.twitterHandle || "")}"></label><label>LinkedIn<input name="linkedinUrl" value="${esc(u.linkedInUrl || "")}"></label><label>Bio<textarea name="bio">${esc(u.bio || "")}</textarea></label><div class="form-actions"><button class="button" type="submit">Save</button><a class="button secondary" href="/author/${u.id}">View public</a></div></div></div></form>
+    
+    <div style="margin-top: 48px; padding-top: 36px; border-top: 1px solid var(--line);">
+      <div class="page-head" style="padding-bottom:14px">
+        <div class="eyebrow">Security</div>
+        <h2 style="font-family: Fraunces, Georgia, serif; font-size: 1.5rem; margin-top: 4px;">Change Password</h2>
+        <p style="color: var(--muted); font-size: 0.9rem; margin-top: 4px;">Update your password anytime using your current password.</p>
+      </div>
+      <form id="change-password-form" class="profile-form" style="max-width: 540px;">
+        <label>Current password
+          <input type="password" name="currentPassword" required placeholder="Enter your current password" autocomplete="current-password">
+        </label>
+        <label>New password
+          <input type="password" name="newPassword" required placeholder="At least 8 chars with letter and number" autocomplete="new-password">
+        </label>
+        <label>Confirm new password
+          <input type="password" name="confirmNewPassword" required placeholder="Re-enter new password" autocomplete="new-password">
+        </label>
+        <div class="form-actions" style="margin-top: 18px;">
+          <button class="button" type="submit" id="btn-change-pwd">Update Password</button>
+        </div>
+      </form>
+    </div>
+    </section>`,
   );
   const fileInput = $("#profile-file");
   $("#pick-image")?.addEventListener("click", () => fileInput.click());
@@ -2035,6 +2058,34 @@ function profile() {
       render();
     } catch (x) {
       toast(x.message, "error");
+    }
+  });
+
+  $("#change-password-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(e.target));
+    if (f.newPassword !== f.confirmNewPassword) {
+      toast("New passwords do not match.", "error");
+      return;
+    }
+    const btn = $("#btn-change-pwd");
+    btn.disabled = true;
+    btn.textContent = "Updating…";
+    try {
+      const res = await api("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({
+          currentPassword: f.currentPassword,
+          newPassword: f.newPassword,
+        }),
+      });
+      toast(res.message || "Password updated successfully.");
+      e.target.reset();
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Update Password";
     }
   });
 }

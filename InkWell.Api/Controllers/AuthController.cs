@@ -208,6 +208,36 @@ public class AuthController(AppDbContext db, IJwtService jwt, IPasswordHasher ha
     }
 
     // ============================================
+    // CHANGE PASSWORD (AUTHENTICATED)
+    // ============================================
+    [Authorize, HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var firstError = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage)
+                .FirstOrDefault();
+            return BadRequest(new { message = firstError ?? "Please check your inputs." });
+        }
+
+        var user = await db.Users.FindAsync(User.UserId());
+        if (user is null) return Unauthorized();
+
+        if (!hasher.Verify(request.CurrentPassword, user.PasswordHash))
+            return BadRequest(new { message = "Your current password is incorrect." });
+
+        if (request.CurrentPassword == request.NewPassword)
+            return BadRequest(new { message = "New password cannot be the same as your current password." });
+
+        user.PasswordHash = hasher.Hash(request.NewPassword);
+        await db.SaveChangesAsync();
+
+        return Ok(new { message = "Password updated successfully." });
+    }
+
+    // ============================================
     // FORGOT PASSWORD — STEP 1: REQUEST OTP
     // ============================================
     [HttpPost("forgot-password/request-otp")]

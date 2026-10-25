@@ -118,3 +118,14 @@ public class ForgotPasswordResetDto
     [Required, MinLength(8)]
     public string NewPassword { get; set; } = "";
 }
+
+public class ChangePasswordDto
+{
+    [Required(ErrorMessage = "Current password is required.")]
+    public string CurrentPassword { get; set; } = "";
+
+    [Required(ErrorMessage = "New password is required.")]
+    [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d).{8,}$",
+        ErrorMessage = "New password must be at least 8 characters and include a letter and a number.")]
+    public string NewPassword { get; set; } = "";
+}
