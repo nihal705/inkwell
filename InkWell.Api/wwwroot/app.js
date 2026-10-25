@@ -2002,14 +2002,28 @@ function profile() {
       </div>
       <form id="change-password-form" class="profile-form" style="max-width: 540px;">
         <label>Current password
-          <input type="password" name="currentPassword" required placeholder="Enter your current password" autocomplete="current-password">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" name="currentPassword" id="pwd-curr" required placeholder="Enter your current password" autocomplete="current-password" style="padding-right: 42px;">
+            <button type="button" class="pwd-toggle-btn" data-target="pwd-curr" style="position:absolute; right:8px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; padding:4px;" title="Toggle visibility">👁</button>
+          </div>
         </label>
         <label>New password
-          <input type="password" name="newPassword" required placeholder="At least 8 chars with letter and number" autocomplete="new-password">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" name="newPassword" id="pwd-new" required placeholder="At least 8 chars with letter and number" autocomplete="new-password" style="padding-right: 42px;">
+            <button type="button" class="pwd-toggle-btn" data-target="pwd-new" style="position:absolute; right:8px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; padding:4px;" title="Toggle visibility">👁</button>
+          </div>
         </label>
         <label>Confirm new password
-          <input type="password" name="confirmNewPassword" required placeholder="Re-enter new password" autocomplete="new-password">
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="password" name="confirmNewPassword" id="pwd-conf" required placeholder="Re-enter new password" autocomplete="new-password" style="padding-right: 42px;">
+            <button type="button" class="pwd-toggle-btn" data-target="pwd-conf" style="position:absolute; right:8px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; padding:4px;" title="Toggle visibility">👁</button>
+          </div>
         </label>
+        <div style="margin-top: 8px;">
+          <label style="display:inline-flex; align-items:center; gap:8px; font-size:0.85rem; cursor:pointer; color:var(--muted); font-weight:500;">
+            <input type="checkbox" id="show-all-pwd" style="width:auto; margin:0;"> Show all passwords
+          </label>
+        </div>
         <div class="form-actions" style="margin-top: 18px;">
           <button class="button" type="submit" id="btn-change-pwd">Update Password</button>
         </div>
@@ -2059,6 +2073,27 @@ function profile() {
     } catch (x) {
       toast(x.message, "error");
     }
+  });
+
+  $$(".pwd-toggle-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const input = $(`#${btn.dataset.target}`);
+      if (!input) return;
+      const isPwd = input.type === "password";
+      input.type = isPwd ? "text" : "password";
+      btn.textContent = isPwd ? "🙈" : "👁";
+    });
+  });
+
+  $("#show-all-pwd")?.addEventListener("change", (e) => {
+    const isChecked = e.target.checked;
+    ["pwd-curr", "pwd-new", "pwd-conf"].forEach(id => {
+      const el = $(`#${id}`);
+      if (el) el.type = isChecked ? "text" : "password";
+    });
+    $$(".pwd-toggle-btn").forEach(btn => {
+      btn.textContent = isChecked ? "🙈" : "👁";
+    });
   });
 
   $("#change-password-form")?.addEventListener("submit", async (e) => {
