@@ -636,6 +636,10 @@ function openSummaryModal(title, author, summary) {
   `;
   document.body.appendChild(modal);
 
+  modal.onclick = (e) => {
+    if (e.target === modal) modal.remove();
+  };
+
   const target = $("#share-preview-target", modal);
 
   $("#btn-download", modal).onclick = async () => {
