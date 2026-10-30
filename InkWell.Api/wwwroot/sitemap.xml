@@ -34,9 +34,15 @@
 
   <!-- Published Articles -->
   <url>
-    <loc>https://inkwell-magazine.vercel.app/post/13</loc>
+    <loc>https://inkwell-magazine.vercel.app/post/14</loc>
+    <lastmod>2026-10-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://inkwell-magazine.vercel.app/post/13</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
   </url>
   <url>
     <loc>https://inkwell-magazine.vercel.app/post/12</loc>
