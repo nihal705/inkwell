@@ -404,14 +404,18 @@ function generateSummary(content, title = "") {
 }
 
 // ==================== HOUSE ADS ====================
+const houseAds = {
+  mycodendotes: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/mycodenotes.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>MyCodeNotes</h3><p>A structured learning hub for DSA, web dev, and quick notes.</p><a href="https://mycodenotes.dev" target="_blank" class="promo-btn">Visit Site →</a></div></div>`,
+  kwikcric: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/kwikcric.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>KwikCric</h3><p>A comprehensive cricket platform combining extensive stats and interactive games.</p><a href="https://kwikcric.gnihal.com" target="_blank" class="promo-btn">Explore KwikCric →</a></div></div>`,
+  roamly: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/roamly.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>Roamly</h3><p>A full-stack vacation-rental booking platform with guest, host, and admin workflows.</p><a href="https://roamly.gnihal.com" target="_blank" class="promo-btn">Explore Stays →</a></div></div>`,
+  weather: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/weather-app.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>Weather App</h3><p>A responsive weather application with real-time conditions and 5-day forecasts.</p><a href="https://weather-app-nxhl.vercel.app" target="_blank" class="promo-btn">Check Forecast →</a></div></div>`,
+  wandervibe: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/wandervibe.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>WanderVibe</h3><p>An interactive travel discovery platform to explore 50+ destinations worldwide.</p><a href="https://wanderVibe.vercel.app" target="_blank" class="promo-btn">Discover Places →</a></div></div>`,
+};
+
 function renderAd(specificKey = null) {
-  const ads = {
-    mycodendotes: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/mycodenotes.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>MyCodeNotes</h3><p>A structured learning hub for DSA, web dev, and quick notes.</p><a href="https://mycodenotes.dev" target="_blank" class="promo-btn">Visit Site →</a></div></div>`,
-    kwikcric: `<div class="promo-card"><div class="promo-img" style="background-image: url('/assets/kwikcric.png');"></div><div class="promo-content"><span class="promo-tag">Creator's Pick</span><h3>KwikCric</h3><p>A comprehensive cricket platform combining extensive stats and interactive games.</p><a href="https://kwikcric.vercel.app" target="_blank" class="promo-btn">Explore KwikCric →</a></div></div>`,
-  };
-  const adKeys = Object.keys(ads);
-  const key = specificKey || adKeys[Math.floor(Math.random() * adKeys.length)];
-  return ads[key];
+  const adKeys = Object.keys(houseAds);
+  const key = specificKey && houseAds[specificKey] ? specificKey : adKeys[Math.floor(Math.random() * adKeys.length)];
+  return houseAds[key];
 }
 
 // ==================== ROUTER & SHELL ====================
@@ -1174,7 +1178,7 @@ async function postPage(id) {
     const encUrl = encodeURIComponent(shareUrl);
 
     // Generate Two Different Ads for Desktop
-    const adKeys = ["mycodendotes", "kwikcric"];
+    const adKeys = Object.keys(houseAds);
     const leftAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
     let rightAdKey = adKeys[Math.floor(Math.random() * adKeys.length)];
     if (adKeys.length > 1) {
