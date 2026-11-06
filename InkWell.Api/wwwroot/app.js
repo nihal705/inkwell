@@ -2781,9 +2781,10 @@ async function admin() {
               <button class="button small" id="btn-create-series">+ Create New Series</button>
             </div>
 
-            <!-- CREATE SERIES FORM -->
+            <!-- CREATE / EDIT SERIES FORM -->
             <div id="series-create-form" style="display:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px;margin-bottom:24px;">
-              <h4 style="margin:0 0 16px;">Create a New Series</h4>
+              <h4 id="series-form-heading" style="margin:0 0 16px;">Create a New Series</h4>
+              <input type="hidden" id="edit-series-id" value="">
               <div style="display:flex;flex-direction:column;gap:12px;">
                 <label>Series Title <span style="color:var(--danger)">*</span>
                   <input type="text" id="new-series-title" placeholder="e.g., Bengaluru's Transit Revolution">
@@ -2817,7 +2818,10 @@ async function admin() {
                   <p>${esc(s.description || "No description provided.")}</p>
                   <div class="series-admin-card-actions">
                     <a href="/series/${esc(s.slug)}" target="_blank" style="color:var(--accent);font-weight:600;">View Page ↗</a>
-                    <button class="link-button danger-link delete-series-btn" data-id="${s.id}" style="color:var(--danger)">Delete</button>
+                    <div style="display:flex;gap:12px;align-items:center;">
+                      <button class="link-button edit-series-btn" data-id="${s.id}" data-title="${esc(s.title)}" data-desc="${esc(s.description || '')}" data-cover="${esc(s.coverImageUrl || '')}" style="color:var(--accent);font-weight:600;">Edit</button>
+                      <button class="link-button danger-link delete-series-btn" data-id="${s.id}" style="color:var(--danger)">Delete</button>
+                    </div>
                   </div>
                 </div>
               `).join("")}
@@ -2826,11 +2830,40 @@ async function admin() {
         `;
 
         $("#btn-create-series")?.addEventListener("click", () => {
+          $("#edit-series-id").value = "";
+          $("#series-form-heading").textContent = "Create a New Series";
+          $("#new-series-title").value = "";
+          $("#new-series-desc").value = "";
+          $("#new-series-cover").value = "";
+          $("#new-series-file").value = "";
+          $("#submit-new-series").textContent = "Create Series";
           $("#series-create-form").style.display = "block";
+          $("#series-create-form").scrollIntoView({ behavior: "smooth", block: "nearest" });
           $("#new-series-title").focus();
         });
         $("#cancel-new-series")?.addEventListener("click", () => {
           $("#series-create-form").style.display = "none";
+          $("#edit-series-id").value = "";
+        });
+
+        $$(".edit-series-btn", out).forEach(btn => {
+          btn.addEventListener("click", () => {
+            const id = btn.dataset.id;
+            const title = btn.dataset.title || "";
+            const desc = btn.dataset.desc || "";
+            const cover = btn.dataset.cover || "";
+
+            $("#edit-series-id").value = id;
+            $("#series-form-heading").textContent = `Edit Series: ${title}`;
+            $("#new-series-title").value = title;
+            $("#new-series-desc").value = desc;
+            $("#new-series-cover").value = cover;
+            $("#new-series-file").value = "";
+            $("#submit-new-series").textContent = "Save Changes";
+            $("#series-create-form").style.display = "block";
+            $("#series-create-form").scrollIntoView({ behavior: "smooth", block: "nearest" });
+            $("#new-series-title").focus();
+          });
         });
 
         $("#new-series-file")?.addEventListener("change", async (e) => {
@@ -2847,6 +2880,7 @@ async function admin() {
         });
 
         $("#submit-new-series")?.addEventListener("click", async () => {
+          const editId = $("#edit-series-id").value;
           const title = $("#new-series-title").value.trim();
           const desc = $("#new-series-desc").value.trim();
           const cover = $("#new-series-cover").value.trim();
@@ -2855,15 +2889,27 @@ async function admin() {
             return;
           }
           try {
-            await api("/api/series", {
-              method: "POST",
-              body: JSON.stringify({
-                title,
-                description: desc,
-                coverImageUrl: cover || null
-              })
-            });
-            toast("Series created successfully!");
+            if (editId) {
+              await api(`/api/series/${editId}`, {
+                method: "PUT",
+                body: JSON.stringify({
+                  title,
+                  description: desc,
+                  coverImageUrl: cover || null
+                })
+              });
+              toast("Series updated successfully!");
+            } else {
+              await api("/api/series", {
+                method: "POST",
+                body: JSON.stringify({
+                  title,
+                  description: desc,
+                  coverImageUrl: cover || null
+                })
+              });
+              toast("Series created successfully!");
+            }
             renderTab("series");
           } catch (err) {
             toast(err.message, "error");
