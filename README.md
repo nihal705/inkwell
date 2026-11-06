@@ -4,7 +4,7 @@ An article publishing platform where anyone can write and post. New writers regi
 
 Built with .NET 10, EF Core, Neon PostgreSQL, Cloudinary, and a vanilla JavaScript SPA.
 
-**Live:** [https://inkwell-magazine.vercel.app](https://inkwell-magazine.vercel.app)
+**Live:** [https://inkwell-magazine.gnihal.com](https://inkwell-magazine.gnihal.com)
 
 ---
 
